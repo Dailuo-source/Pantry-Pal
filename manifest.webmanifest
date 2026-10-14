@@ -1,6 +1,6 @@
 {
-  "name": "Pantry Craft",
-  "short_name": "Pantry",
+  "name": "Pantry Pal",
+  "short_name": "Pantry Pal",
   "description": "Pantry, recipes and grocery list in one. See what you can cook and what to buy.",
   "start_url": "./",
   "scope": "./",

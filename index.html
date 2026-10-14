@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F2F4F0" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111513" media="(prefers-color-scheme: dark)">
-<title>Pantry Craft</title>
+<title>Pantry Pal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
@@ -195,7 +195,7 @@ label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weigh
 <div class="app">
   <header class="top">
     <div class="wrap">
-      <div><div class="brand">Pantry Craft</div><h1 id="title">What can I make?</h1></div>
+      <div><div class="brand">Pantry Pal</div><h1 id="title">What can I make?</h1></div>
       <button id="sync" class="sync" data-act="refreshNow" title="Sync with your sheet">Connecting…</button>
     </div>
   </header>
@@ -336,7 +336,7 @@ async function flush(){
     if(queue.length){clearTimeout(flushT);flushT=setTimeout(flush,350);}
     return;
   }
-  if(res&&res.error==="bad_key"){auth="need";setSync("off");render("That key didn't work. Check it in your sheet: Pantry Craft menu → Show app key and link.");return;}
+  if(res&&res.error==="bad_key"){auth="need";setSync("off");render("That key didn't work. Check it in your sheet: Pantry Pal menu → Show app key and link.");return;}
   setSync("error");
   if(res&&res.message&&res.error!=="network")toast(res.message);
   else toast(ops.length?"Can't reach your sheet. Your changes will retry.":"Can't reach your sheet. Tap the status to retry.");
@@ -401,7 +401,7 @@ function render(msg){
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===tab)));
   const v=$("#view");
   if(auth==="noapi"){$("#title").textContent="Almost there";v.innerHTML=`<div class="connect"><h2>Add your sheet's web app link</h2><p>Open <code>index.html</code>, paste your Apps Script web app URL into <code>API_URL</code> near the top of the script, then publish again.</p></div>`;return;}
-  if(auth==="need"){$("#title").textContent="Connect";v.innerHTML=`<div class="connect"><h2>Connect to your sheet</h2><p>Enter the app key from your Pantry Craft sheet. In Google Sheets, open the <b>Pantry Craft</b> menu and choose <b>Show app key and link</b>. This phone remembers it.</p><form id="keyForm" class="addbar" autocomplete="off"><input id="keyInput" placeholder="App key" aria-label="App key" autocapitalize="off" spellcheck="false" value="${esc(KEY)}"><button class="btn primary" type="submit">Connect</button></form>${msg?`<p class="err">${esc(msg)}</p>`:""}</div>`;return;}
+  if(auth==="need"){$("#title").textContent="Connect";v.innerHTML=`<div class="connect"><h2>Connect to your sheet</h2><p>Enter the app key from your Pantry Pal sheet. In Google Sheets, open the <b>Pantry Pal</b> menu and choose <b>Show app key and link</b>. This phone remembers it.</p><form id="keyForm" class="addbar" autocomplete="off"><input id="keyInput" placeholder="App key" aria-label="App key" autocapitalize="off" spellcheck="false" value="${esc(KEY)}"><button class="btn primary" type="submit">Connect</button></form>${msg?`<p class="err">${esc(msg)}</p>`:""}</div>`;return;}
   $("#title").textContent={recipes:"What can I make?",pantry:"Pantry",list:"Grocery list"}[tab];
   if(tab==="recipes")v.innerHTML=`<div id="exNote"></div><div class="toolbar"><div class="chips" id="rFilters" role="group" aria-label="Filter recipes"></div><button class="btn small primary" data-act="newRecipe">+ New</button></div><div id="rList" class="cards"></div><div class="sheetlink" id="sheetLink"></div>`;
   else if(tab==="pantry")v.innerHTML=`<form id="pantryAdd" class="addbar" autocomplete="off"><input id="pantryInput" placeholder="Add or find, e.g. 6 eggs" aria-label="Add or find a pantry item" value="${esc(pFilter)}"><button class="btn primary" type="submit">Add</button></form><div id="exNote"></div><div id="pList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
