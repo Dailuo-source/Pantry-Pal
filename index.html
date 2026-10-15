@@ -189,6 +189,16 @@ label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weigh
 .toast button{background:none;border:0;color:var(--bg);font-weight:700;text-decoration:underline;cursor:pointer;padding:4px 6px}
 .toast span{min-width:0}
 .textout{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:220px}
+
+/* barcode scanner */
+.btn.icon{padding:0;width:42px;flex:none}
+.scanbox{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;width:100%}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanframe{position:absolute;left:10%;right:10%;top:28%;bottom:28%;border:2px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.28)}
+.torch{position:absolute;right:10px;bottom:10px}
+.scanstatus{margin:0;color:var(--muted);font-size:14px;text-align:center}
+.scanhint{font-size:13px;color:var(--muted)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;cursor:pointer;font-size:inherit}
 </style>
 </head>
 <body>
@@ -288,8 +298,9 @@ function guessCat(name){const n=" "+String(name||"").toLowerCase()+" ";for(const
    Changes apply on screen right away, then go to the sheet in batches.
    ===================================================================== */
 const isGAS=!!(window.google&&google.script&&google.script.run);
-const COLLS=["items","recipes","list"];
-let S={items:[],recipes:[],list:[]};
+const COLLS=["items","recipes","list","barcodes"];
+let S={items:[],recipes:[],list:[],barcodes:[]};
+let barcodeServer=true; // false when the sheet's Code.gs predates the Barcodes tab
 let ready=false,auth="ok",KEY="",sheetUrl="",lastSync=0,syncState="connecting";
 let queue=[],inflight=false,flushT=null,retryT=null;
 try{KEY=localStorage.getItem("pc.key")||"";sheetUrl=localStorage.getItem("pc.sheet")||"";}catch(e){}
@@ -316,7 +327,8 @@ function normalize(st){
   return{
     items:(st.items||[]).map(r=>Object.assign({},r,{qty:+r.qty||0,unit:normUnit(r.unit,"pcs"),staple:!!r.staple,inStock:!!r.inStock})),
     recipes:(st.recipes||[]).map(r=>Object.assign({},r,{draft:!!r.draft,servings:Math.max(1,+r.servings||1),ingredients:Array.isArray(r.ingredients)?r.ingredients:String(r.ingredients||"").split(/\n/).map(parseLine).filter(Boolean)})),
-    list:(st.list||[]).map(r=>Object.assign({},r,{qty:r.qty==null||r.qty===""?null:+r.qty,unit:normUnit(r.unit,""),for:Array.isArray(r.for)?r.for:String(r.for||"").split(",").map(s=>s.trim()).filter(Boolean),checked:!!r.checked}))
+    list:(st.list||[]).map(r=>Object.assign({},r,{qty:r.qty==null||r.qty===""?null:+r.qty,unit:normUnit(r.unit,""),for:Array.isArray(r.for)?r.for:String(r.for||"").split(",").map(s=>s.trim()).filter(Boolean),checked:!!r.checked})),
+    barcodes:(st.barcodes||[]).map(r=>Object.assign({},r,{code:String(r.code||""),qty:r.qty==null||r.qty===""?null:+r.qty,unit:normUnit(r.unit,"pcs")}))
   };
 }
 async function flush(){
@@ -330,6 +342,7 @@ async function flush(){
   if(res&&res.ok){
     queue=queue.slice(ops.length);
     if(res.sheetUrl){sheetUrl=res.sheetUrl;try{localStorage.setItem("pc.sheet",sheetUrl);}catch(e){}}
+    barcodeServer=!!(res.state&&Array.isArray(res.state.barcodes));
     S=normalize(res.state);queue.forEach(applyLocal);
     const first=!ready;ready=true;lastSync=Date.now();setSync("ok");
     if(first)render();else onData();
@@ -404,8 +417,8 @@ function render(msg){
   if(auth==="need"){$("#title").textContent="Connect";v.innerHTML=`<div class="connect"><h2>Connect to your sheet</h2><p>Enter the app key from your Pantry Pal sheet. In Google Sheets, open the <b>Pantry Pal</b> menu and choose <b>Show app key and link</b>. This phone remembers it.</p><form id="keyForm" class="addbar" autocomplete="off"><input id="keyInput" placeholder="App key" aria-label="App key" autocapitalize="off" spellcheck="false" value="${esc(KEY)}"><button class="btn primary" type="submit">Connect</button></form>${msg?`<p class="err">${esc(msg)}</p>`:""}</div>`;return;}
   $("#title").textContent={recipes:"What can I make?",pantry:"Pantry",list:"Grocery list"}[tab];
   if(tab==="recipes")v.innerHTML=`<div id="exNote"></div><div class="toolbar"><div class="chips" id="rFilters" role="group" aria-label="Filter recipes"></div><button class="btn small primary" data-act="newRecipe">+ New</button></div><div id="rList" class="cards"></div><div class="sheetlink" id="sheetLink"></div>`;
-  else if(tab==="pantry")v.innerHTML=`<form id="pantryAdd" class="addbar" autocomplete="off"><input id="pantryInput" placeholder="Add or find, e.g. 6 eggs" aria-label="Add or find a pantry item" value="${esc(pFilter)}"><button class="btn primary" type="submit">Add</button></form><div id="exNote"></div><div id="pList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
-  else v.innerHTML=`<form id="listAdd" class="addbar" autocomplete="off"><input id="listInput" placeholder="Add item, e.g. 2 L milk" aria-label="Add a grocery item"><button class="btn primary" type="submit">Add</button></form><div id="lList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
+  else if(tab==="pantry")v.innerHTML=`<form id="pantryAdd" class="addbar" autocomplete="off"><input id="pantryInput" placeholder="Add or find, e.g. 6 eggs" aria-label="Add or find a pantry item" value="${esc(pFilter)}"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("pantry")}</form><div id="exNote"></div><div id="pList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
+  else v.innerHTML=`<form id="listAdd" class="addbar" autocomplete="off"><input id="listInput" placeholder="Add item, e.g. 2 L milk" aria-label="Add a grocery item"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("list")}</form><div id="lList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
   refresh();
 }
 function onData(){if(auth!=="ok")return;refresh();if(sheet&&sheet.type==="recipe")renderSheet();}
@@ -482,14 +495,16 @@ function renderList(){
 }
 
 /* ---------- bottom sheet ---------- */
-function openSheet(s){sheet=s;$("#sheetWrap").hidden=false;document.body.style.overflow="hidden";renderSheet(true);}
-function closeSheet(){sheet=null;$("#sheetWrap").hidden=true;$("#sheetBody").innerHTML="";document.body.style.overflow="";}
+function openSheet(s){stopScan();sheet=s;$("#sheetWrap").hidden=false;document.body.style.overflow="hidden";renderSheet(true);}
+function closeSheet(){stopScan();sheet=null;$("#sheetWrap").hidden=true;$("#sheetBody").innerHTML="";document.body.style.overflow="";}
 function head(title,sub){return`<div class="sheet-h"><div style="min-width:0"><h2 id="sheetTitle">${title}</h2>${sub?`<div class="sub">${sub}</div>`:""}</div><button class="close" data-act="close" aria-label="Close">×</button></div>`;}
 function renderSheet(first){
   if(!sheet)return;const b=$("#sheetBody");
   if(sheet.type==="recipe")b.innerHTML=sheetRecipe();
   else if(sheet.type==="editRecipe"){b.innerHTML=sheetEditRecipe();bindRecipeForm();}
   else if(sheet.type==="editItem"){b.innerHTML=sheetEditItem();bindItemForm();}
+  else if(sheet.type==="scan"){b.innerHTML=sheetScan();startScan();}
+  else if(sheet.type==="scanResult"){b.innerHTML=sheetScanResult();bindScanResult();}
   else if(sheet.type==="text")b.innerHTML=head("Grocery list")+`<div class="stack"><p style="margin:0;color:var(--muted)">Select all and copy, then paste into a message.</p><textarea class="textout" readonly id="txtOut">${esc(sheet.text)}</textarea></div>`;
   if(first)$(".sheet").scrollTop=0;
 }
@@ -579,6 +594,23 @@ function bindItemForm(){
 }
 
 /* ---------- actions ---------- */
+// Adds to an existing pantry item when the name matches, otherwise creates one.
+// packs: when scanning, lets "3 packages" land on an item you count in pcs/packs/cans.
+async function addToPantry(name,qty,unit,category,packs){
+  const ex=findExact(name);
+  if(ex){
+    if(ex.staple){await store.update("items",ex.id,{inStock:true});return{msg:`${ex.name} marked in stock`};}
+    if(qty==null)return{edit:ex.id};
+    let c=convert(qty,unit,ex.unit);
+    if(c==null&&packs&&["pcs","pack","can"].includes(ex.unit))c=packs;
+    const set=async nq=>{delete pendQ[ex.id];clearTimeout(pendT[ex.id]);await store.update("items",ex.id,{qty:nq});};
+    if(c!=null){const nq=round2(effQty(ex)+c);await set(nq);return{msg:`${ex.name}: now ${qtyText(nq,ex.unit)}`};}
+    if(effQty(ex)<=0){delete pendQ[ex.id];clearTimeout(pendT[ex.id]);await store.update("items",ex.id,{qty,unit});return{msg:`${ex.name}: now ${qtyText(qty,unit)}`};}
+    return{err:`${ex.name} is counted in ${ex.unit==="l"?"L":ex.unit}. Edit it to change units.`};
+  }
+  const data={name:cap(name),qty:qty!=null?qty:1,unit:qty!=null?(unit||"pcs"):"pcs",category:category||guessCat(name),staple:false,inStock:true};
+  await store.add("items",data);return{msg:`Added ${data.name} to ${data.category}`};
+}
 async function addToList(name,qty,unit,forRecipe){
   unit=unit||"";const ex=listEntry(name);
   if(ex){
@@ -642,6 +674,148 @@ function listText(){
   return CATS.filter(c=>g[c]).map(c=>c+"\n"+g[c].map(l=>"- "+l.name+(l.qty!=null?" ("+qtyText(l.qty,l.unit)+")":"")).join("\n")).join("\n\n");
 }
 
+/* ---------- barcode scanning ----------
+   1. Camera + barcode reader (Chrome's built-in one on Android; a fallback reader loads on other phones)
+   2. Lookup: your saved barcodes first, then Open Food Facts (free product database)
+   3. Confirm the name and size, add to pantry or list, and remember the barcode for next time */
+const SCAN_BTN=dest=>`<button class="btn icon" type="button" data-act="scan" data-dest="${dest}" aria-label="Scan a barcode" title="Scan a barcode"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></button>`;
+let scanStream=null,scanTimer=null,scanLast="",scanHits=0,scanDest="pantry",detectorP=null,torchOn=false;
+const normCode=c=>String(c||"").replace(/\D/g,"").replace(/^0+/,"");
+const canCamera=()=>!isGAS&&window.isSecureContext&&!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+function getDetector(){
+  if(detectorP)return detectorP;
+  const formats=["ean_13","ean_8","upc_a","upc_e"];
+  detectorP=(async()=>{
+    if("BarcodeDetector" in window){try{const sup=await BarcodeDetector.getSupportedFormats();const f=formats.filter(x=>sup.includes(x));if(f.length)return new BarcodeDetector({formats:f});}catch(e){}}
+    const m=await import("https://cdn.jsdelivr.net/npm/barcode-detector@3.2.2/dist/es/ponyfill.js");
+    return new m.BarcodeDetector({formats});
+  })();
+  detectorP.catch(()=>{detectorP=null;});
+  return detectorP;
+}
+function sheetScan(){
+  const cam=canCamera();
+  return head("Scan a barcode",`<span>${scanDest==="list"?"Adds to your grocery list":"Adds to your pantry"}</span>`)+`<div class="stack">
+    ${cam?`<div class="scanbox"><video id="scanVideo" playsinline muted></video><div class="scanframe" aria-hidden="true"></div><button class="btn small torch" type="button" data-act="torch" id="torchBtn" hidden>Light</button></div><p id="scanStatus" class="scanstatus" aria-live="polite">Starting camera…</p>`
+      :`<p class="scanstatus">${isGAS?"The camera only works in the installed app (your GitHub Pages link). You can still type the barcode number below.":"This browser can't open the camera. Type the barcode number below."}</p>`}
+    <form id="codeForm" class="addbar" autocomplete="off"><input id="codeInput" inputmode="numeric" placeholder="Or type the barcode number" aria-label="Barcode number"><button class="btn" type="submit">Look up</button></form>
+  </div>`;
+}
+async function startScan(){
+  if(!canCamera())return;
+  const v=$("#scanVideo"),setS=t=>{const st=$("#scanStatus");if(st)st.textContent=t;};
+  scanLast="";scanHits=0;torchOn=false;
+  try{
+    const det=getDetector();
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+    if(!sheet||sheet.type!=="scan"||!v||!v.isConnected){stream.getTracks().forEach(t=>t.stop());return;}
+    scanStream=stream;v.srcObject=stream;await v.play();
+    try{const caps=stream.getVideoTracks()[0].getCapabilities();if(caps&&caps.torch)$("#torchBtn").hidden=false;}catch(e){}
+    setS("Loading the barcode reader…");
+    const detector=await det;
+    if(!scanStream)return;
+    setS("Hold the barcode inside the box");
+    const tick=async()=>{
+      if(!scanStream)return;
+      try{
+        if(v.readyState>=2){
+          const codes=await detector.detect(v);const c=codes&&codes[0]&&codes[0].rawValue;
+          // Accept a code only after reading it twice in a row, to avoid misreads
+          if(c){if(c===scanLast)scanHits++;else{scanLast=c;scanHits=1;}if(scanHits>=2){onScanned(c);return;}}
+        }
+      }catch(e){}
+      if(scanStream)scanTimer=setTimeout(tick,120);
+    };
+    tick();
+  }catch(e){
+    stopScan();
+    const n=e&&e.name;
+    setS(n==="NotAllowedError"||n==="SecurityError"?"Camera access is blocked. Allow the camera for this site in Chrome's site settings, or type the number below."
+      :n==="NotFoundError"?"No camera found. Type the number below.":"Couldn't start the scanner. Type the number below.");
+  }
+}
+function stopScan(){clearTimeout(scanTimer);scanTimer=null;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}}
+async function onScanned(code){
+  stopScan();try{navigator.vibrate&&navigator.vibrate(60);}catch(e){}
+  const s={type:"scanResult",code:String(code).replace(/\D/g,""),loading:true,pk:1};openSheet(s);
+  const r=await lookupBarcode(s.code);
+  if(sheet!==s)return;s.loading=false;s.result=r;renderSheet(true);
+}
+// "900 g", "1.5 L", "6 x 355 ml", "75 cl" → {qty, unit}
+function parseQty(s){
+  s=String(s||"").toLowerCase().replace(/(\d),(\d)/g,"$1.$2");
+  let n=1,m=s.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kg|g|mg|ml|cl|l|oz|lb)\b/);
+  if(m){n=+m[1];m=[m[0],m[2],m[3]];}else m=s.match(/(\d+(?:\.\d+)?)\s*(kg|g|mg|ml|cl|l|oz|lb)\b/);
+  if(!m)return null;let q=+m[1]*n,u=m[2];
+  if(u==="cl"){q*=10;u="ml";}if(u==="mg"){q/=1000;u="g";}
+  return q>0?{qty:round2(q),unit:u}:null;
+}
+const cleanName=s=>cap(String(s||"").replace(/\s*[-–,(]?\s*\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|cl|l|oz|lb)\b.*$/i,"").replace(/\s+/g," ").trim());
+async function fetchOFF(code){
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
+  try{
+    const r=await fetch("https://world.openfoodfacts.org/api/v2/product/"+encodeURIComponent(code)+".json?fields=product_name,product_name_en,generic_name,brands,quantity",{signal:ctl.signal});
+    if(r.status===404)return null;
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();return j&&j.status===1&&j.product?j.product:null;
+  }finally{clearTimeout(to);}
+}
+async function lookupBarcode(code){
+  const k=normCode(code);
+  const saved=S.barcodes.find(b=>normCode(b.code)===k);
+  if(saved)return{source:"saved",code,name:saved.name,qty:saved.qty,unit:saved.unit,category:saved.category,brand:saved.brand,savedId:saved.id};
+  try{
+    let p=await fetchOFF(code);
+    if(!p&&code.length===12)p=await fetchOFF("0"+code); // UPC-A is also stored as 13-digit EAN
+    if(!p)return{source:"none",code};
+    const name=cleanName(p.product_name_en||p.product_name||p.generic_name||"");const q=parseQty(p.quantity);
+    return{source:"off",code,name,qty:q?q.qty:null,unit:q?q.unit:"pcs",category:guessCat(name),brand:String(p.brands||"").split(",")[0].trim()};
+  }catch(e){return{source:"offline",code};}
+}
+function sheetScanResult(){
+  if(sheet.loading)return head("Looking it up…")+`<div class="stack"><p class="scanstatus">Barcode ${esc(sheet.code)}</p></div>`;
+  const r=sheet.result,dest=scanDest;
+  const src={saved:"From your saved barcodes.",off:"Found in Open Food Facts. Check the name and size.",none:"Not in the product database yet. Name it once and it's remembered.",offline:"Couldn't reach the product database. Name it and it's remembered."}[r.source];
+  return head(r.name?esc(r.name):"New product",`<span>${esc(src)}</span>`)+`<form id="scanForm" class="stack" autocomplete="off">
+    <label class="field">Name in your pantry<input id="sName" required value="${esc(r.name||"")}" list="pantryNames" placeholder="e.g. Spaghetti"></label>
+    <datalist id="pantryNames">${S.items.map(i=>`<option value="${esc(i.name)}"></option>`).join("")}</datalist>
+    <div id="sMatch" class="scanhint" aria-live="polite"></div>
+    <div class="row2"><label class="field">Size per package<input id="sQty" type="number" step="any" min="0" inputmode="decimal" value="${r.qty!=null?esc(r.qty):""}" placeholder="1"></label><label class="field">Unit<select id="sUnit">${UNITS.map(u=>`<option value="${u}" ${(r.unit||"pcs")===u?"selected":""}>${u==="l"?"L":u}</option>`).join("")}</select></label></div>
+    <div class="serv"><span>Packages</span><div class="stepper"><button type="button" data-act="pk" data-d="-1" aria-label="Fewer packages">−</button><span id="sPk">${sheet.pk}</span><button type="button" data-act="pk" data-d="1" aria-label="More packages">+</button></div></div>
+    <label class="field">Section<select id="sCat">${CATS.map(c=>`<option ${c===(r.category||guessCat(r.name))?"selected":""}>${esc(c)}</option>`).join("")}</select></label>
+    <p class="scanhint" style="margin:0">${r.brand?esc(r.brand)+" · ":""}Barcode ${esc(r.code)}</p>
+    ${barcodeServer?`<label class="switch"><input type="checkbox" id="sRemember" checked> Remember this barcode</label>`:`<p class="scanhint" style="margin:0">To remember barcodes, update Code.gs in Apps Script.</p>`}
+    <div class="actions"><button class="btn ${dest==="pantry"?"primary":""} wide" type="submit" data-to="pantry">Add to pantry</button><button class="btn ${dest==="list"?"primary":""} wide" type="submit" data-to="list">Add to list</button></div>
+    <button class="btn ghost" type="button" data-act="scan" data-dest="${dest}">Scan a different item</button>
+  </form>`;
+}
+function updateScanMatch(){
+  const el=$("#sMatch");if(!el)return;const n=$("#sName").value.trim();
+  if(!n){el.textContent="";return;}
+  const ex=findExact(n);
+  if(ex){el.innerHTML=`Adds to your pantry item <b>${esc(ex.name)}</b> (${ex.staple?"staple":"now "+esc(qtyText(effQty(ex),ex.unit)||"0")}).`;const c=$("#sCat");if(c&&CATS.includes(ex.category))c.value=ex.category;return;}
+  const f=findItem(n);
+  el.innerHTML=f?`New item. Is it your <button type="button" class="linkbtn" data-act="useName" data-name="${esc(f.name)}">${esc(f.name)}</button>?`:"This will be a new pantry item.";
+}
+function bindScanResult(){const i=$("#sName");if(!i)return;i.addEventListener("input",updateScanMatch);updateScanMatch();}
+async function submitScan(to){
+  const r=sheet.result;const name=$("#sName").value.trim();if(!name)return;
+  const per=parseFloat($("#sQty").value);const qtyPer=per>0?round2(per):null;const unit=$("#sUnit").value;const pk=sheet.pk||1;const cat=$("#sCat").value;
+  const total=round2((qtyPer||1)*pk);
+  if(to==="pantry"){
+    const res=await addToPantry(name,total,unit,cat,pk);
+    if(res.err){toast(res.err);return;}
+    toast(res.msg);
+  }else{await addToList(name,total,unit,null);toast(`Added ${cap(name)} to your grocery list`);}
+  const rem=$("#sRemember");
+  if(barcodeServer&&rem&&rem.checked){
+    const data={code:r.code,name:cap(name),qty:qtyPer,unit,category:cat,brand:r.brand||""};
+    if(r.savedId)await store.update("barcodes",r.savedId,data);else await store.add("barcodes",data);
+  }
+  openSheet({type:"scan"}); // straight back to the camera for the next item
+}
+async function toggleTorch(){if(!scanStream)return;torchOn=!torchOn;try{await scanStream.getVideoTracks()[0].applyConstraints({advanced:[{torch:torchOn}]});}catch(e){torchOn=false;}const b=$("#torchBtn");if(b)b.textContent=torchOn?"Light off":"Light";}
+
 /* ---------- toast ---------- */
 let tT=null,tFn=null;
 function toast(msg,action){const t=$("#toast");$("#toastMsg").textContent=msg;const a=$("#toastAct");tFn=action?action.fn:null;a.hidden=!action;if(action)a.textContent=action.label;t.hidden=false;clearTimeout(tT);tT=setTimeout(()=>{t.hidden=true;tFn=null;},action?6000:2800);}
@@ -663,6 +837,10 @@ document.addEventListener("click",async e=>{
     case"newRecipe":openSheet({type:"editRecipe",id:null});break;
     case"openRecipe":openSheet({type:"recipe",id});break;
     case"editRecipe":openSheet({type:"editRecipe",id:sheet.id});break;
+    case"scan":scanDest=t.dataset.dest||scanDest;openSheet({type:"scan"});break;
+    case"torch":toggleTorch();break;
+    case"pk":{if(!sheet||sheet.type!=="scanResult")break;sheet.pk=Math.max(1,(sheet.pk||1)+ +t.dataset.d);const el=$("#sPk");if(el)el.textContent=sheet.pk;break;}
+    case"useName":{const i=$("#sName");if(i){i.value=t.dataset.name;updateScanMatch();}break;}
     case"setDraft":{if(!r)break;const v=t.dataset.v==="1";await store.update("recipes",r.id,{draft:v});toast(v?"Moved to drafts":"Recipe marked finished");renderSheet();break;}
     case"delRecipe":{const rid=sheet.id;closeSheet();await store.del("recipes",rid);toast("Recipe deleted");break;}
     case"serv":{if(!r)break;const base=Math.max(1,+r.servings||1);sheet.servings=Math.max(1,(sheet.servings||base)+ +t.dataset.d);renderSheet();break;}
@@ -687,20 +865,13 @@ document.addEventListener("submit",async e=>{
   if(id==="keyForm"){e.preventDefault();const k=$("#keyInput").value.trim();if(!k)return;setKey(k);auth="ok";ready=false;render();flush();return;}
   if(id==="pantryAdd"){
     e.preventDefault();const inp=$("#pantryInput");const p=parseLine(inp.value);if(!p)return;
-    const ex=findExact(p.name);
-    if(ex){
-      if(ex.staple){await store.update("items",ex.id,{inStock:true});toast(`${ex.name} marked in stock`);}
-      else if(p.qty!=null){const c=convert(p.qty,p.unit,ex.unit);
-        if(c!=null){const nq=round2(effQty(ex)+c);delete pendQ[ex.id];clearTimeout(pendT[ex.id]);await store.update("items",ex.id,{qty:nq});toast(`${ex.name}: now ${qtyText(nq,ex.unit)}`);}
-        else if(effQty(ex)<=0){await store.update("items",ex.id,{qty:p.qty,unit:p.unit});toast(`${ex.name}: now ${qtyText(p.qty,p.unit)}`);}
-        else{toast(`${ex.name} is counted in ${ex.unit==="l"?"L":ex.unit}. Edit it to change units.`);return;}
-      }else{openSheet({type:"editItem",id:ex.id});}
-    }else{
-      const data={name:cap(p.name),qty:p.qty!=null?p.qty:1,unit:p.qty!=null?p.unit:"pcs",category:guessCat(p.name),staple:false,inStock:true};
-      await store.add("items",data);toast(`Added ${data.name} to ${data.category}`);
-    }
+    const res=await addToPantry(p.name,p.qty,p.qty!=null?p.unit:"pcs",null);
+    if(res.err){toast(res.err);return;}
+    if(res.edit)openSheet({type:"editItem",id:res.edit});else toast(res.msg);
     inp.value="";pFilter="";renderPantry();return;
   }
+  if(id==="codeForm"){e.preventDefault();const c=$("#codeInput").value.replace(/\D/g,"");if(c.length<6){toast("Enter the digits under the barcode.");return;}onScanned(c);return;}
+  if(id==="scanForm"){e.preventDefault();const b=e.submitter;if(b)b.disabled=true;await submitScan(b&&b.dataset.to||scanDest);if(b&&b.isConnected)b.disabled=false;return;}
   if(id==="listAdd"){
     e.preventDefault();const inp=$("#listInput");const p=parseLine(inp.value);if(!p)return;
     await addToList(p.name,p.qty,p.qty!=null?p.unit:"",null);inp.value="";
