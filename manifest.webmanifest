@@ -1,4 +1,5 @@
 {
+  "id": "pantry-pal-app",
   "name": "Pantry Pal",
   "short_name": "Pantry Pal",
   "description": "Pantry, recipes and grocery list in one. See what you can cook and what to buy.",
@@ -9,8 +10,23 @@
   "background_color": "#ECEFEA",
   "theme_color": "#ECEFEA",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
