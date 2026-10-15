@@ -190,6 +190,15 @@ label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weigh
 .toast span{min-width:0}
 .textout{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:220px}
 
+/* recipe icons */
+.rtitle{display:flex;align-items:center;gap:10px;min-width:0}
+.ricon{font-size:24px;line-height:1;flex:none;width:36px;height:36px;display:grid;place-items:center;background:var(--sunk);border-radius:10px}
+.rcard.draft .ricon{opacity:.6}
+.iconbtn{font-size:26px;line-height:1;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);cursor:pointer;margin-right:10px;vertical-align:middle;display:inline-grid;place-items:center}
+.icongrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px}
+.iconopt{font-size:26px;line-height:1;aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.iconopt[aria-pressed="true"]{border:2px solid var(--accent);background:var(--accent-soft)}
+
 /* barcode scanner */
 .btn.icon{padding:0;width:42px;flex:none}
 .scanbox{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;width:100%}
@@ -343,6 +352,7 @@ async function flush(){
     queue=queue.slice(ops.length);
     if(res.sheetUrl){sheetUrl=res.sheetUrl;try{localStorage.setItem("pc.sheet",sheetUrl);}catch(e){}}
     barcodeServer=!!(res.state&&Array.isArray(res.state.barcodes));
+    iconServer=!!(res.state&&(res.state.recipes||[]).some(r=>"icon" in r));
     S=normalize(res.state);queue.forEach(applyLocal);
     const first=!ready;ready=true;lastSync=Date.now();setSync("ok");
     if(first)render();else onData();
@@ -431,6 +441,96 @@ function refresh(){
 }
 const loadingHTML=`<div class="empty"><strong>Loading your kitchen…</strong>Reading recipes, pantry and list from your sheet.</div>`;
 
+/* ---------- recipe icons ----------
+   Picks a food emoji from the recipe name, then from its main ingredients.
+   Order matters: specific dishes come before broad words (e.g. "chicken noodle soup" → 🍜 before "chicken" → 🍗).
+   Your own choice (Icon column / tap to change) always wins. */
+const ICON_RULES=[
+  [/onigiri|rice ball|kimbap|gimbap/,"🍙"],
+  [/sushi|\bnigiri|sashimi|maki\b|poke/,"🍣"],
+  [/bento/,"🍱"],
+  [/ramen|pho\b|\budon\b|\bsoba\b|noodle soup|wonton noodle|chicken noodle|laksa/,"🍜"],
+  [/dumpling|gyoza|mandu|wonton|potsticker|siu mai|har gow/,"🥟"],
+  [/\bbao\b|steamed bun/,"🥟"],
+  [/curry/,"🍛"],
+  [/mango sticky rice|\bmango\b/,"🥭"],
+  [/congee|oatmeal|porridge|granola|cereal|jook/,"🥣"],
+  [/omelet|omelette|omurice|frittata|shakshuka|scrambled|fried egg|eggs? benedict|quiche/,"🍳"],
+  [/\bdon\b|donburi|gyudon|oyako|katsudon|bibimbap|rice bowl/,"🍚"],
+  [/fried rice|risotto|paella|biryani|pilaf|basmati|coconut rice|\brice\b/,"🍚"],
+  [/spaghetti|linguin|fettuccin|penne|rigatoni|lasagn|macaroni|mac and cheese|carbonara|bolognese|pomodoro|pasta|noodle|lo mein|chow mein|japchae|pad thai/,"🍝"],
+  [/waffle/,"🧇"],
+  [/pancake|crepe|hotteok/,"🥞"],
+  [/avocado/,"🥑"],
+  [/french toast|toast/,"🍞"],
+  [/salad|slaw/,"🥗"],
+  [/soup|stew|bourguignon|chowder|bisque|sukiyaki|hot ?pot|jjigae|chili\b|goulash|borscht|ragu/,"🍲"],
+  [/meatball/,"🍝"],
+  [/pizza|focaccia flatbread/,"🍕"],
+  [/burrito/,"🌯"],
+  [/taco|quesadilla|enchilada|fajita|nacho/,"🌮"],
+  [/kebab|kabob|shawarma|gyro|falafel|pita|wrap/,"🥙"],
+  [/hot ?dog/,"🌭"],
+  [/sandwich|panini|banh mi|\bsub\b|blt/,"🥪"],
+  [/hamburger steak|salisbury/,"🥩"],
+  [/burger/,"🍔"],
+  [/\bfries\b|frites|chips/,"🍟"],
+  [/wing|drumstick|fried chicken|karaage|adobo|hainanese|roast chicken|chicken thigh|chicken/,"🍗"],
+  [/hash ?brown|potato|croquette|gnocchi|latke/,"🥔"],
+  [/shrimp|prawn|scampi|tempura|lobster|crab/,"🍤"],
+  [/salmon|tilapia|\bfish\b|\bcod\b|tuna|mackerel|trout|halibut|seabass|sea bass/,"🐟"],
+  [/pork belly|bacon/,"🥓"],
+  [/pulled pork|pork|katsu|tonkatsu|\bribs?\b|\bham\b|lamb/,"🍖"],
+  [/beef|steak|brisket|bulgogi|roast\b|pot roast/,"🥩"],
+  [/sausage|bratwurst/,"🌭"],
+  [/cabbage roll|\bcabbage\b|bok choy/,"🥬"],
+  [/eggplant/,"🍆"],
+  [/mushroom/,"🍄"],
+  [/stir ?fr|vegetable|veggie|broccoli/,"🥦"],
+  [/tofu|edamame/,"🥢"],
+  [/lava cake|brownie|chocolate (?:mousse|fondant)|fudge/,"🍫"],
+  [/cupcake|muffin/,"🧁"],
+  [/cheesecake|shortcake|sponge cake|castella|cake|tiramisu/,"🍰"],
+  [/cookie|amaretti|biscotti|shortbread|macaron/,"🍪"],
+  [/\bpie\b|\btart\b|galette|cobbler|crumble/,"🥧"],
+  [/brulee|custard|flan|pudding|jelly|panna cotta/,"🍮"],
+  [/ice cream|gelato|sorbet/,"🍨"],
+  [/donut|doughnut/,"🍩"],
+  [/croissant|danish|pastry/,"🥐"],
+  [/bagel/,"🥯"],
+  [/scone|\bbuns?\b|\brolls?\b|bread|focaccia|baguette|brioche|loaf|kardemummabullar/,"🍞"],
+  [/peach/,"🍑"],[/strawberr/,"🍓"],[/blueberr/,"🫐"],[/banana/,"🍌"],[/apple/,"🍎"],[/lemon/,"🍋"],
+  [/milk|latte/,"🥛"],[/coffee/,"☕"],[/\btea\b|matcha/,"🍵"],[/smoothie|shake|juice/,"🥤"],
+  [/\bjam\b|preserve|marmalade|honey/,"🍯"],
+];
+// When the name says nothing useful, use the first main ingredient
+const ING_ICONS=[
+  [/chicken/,"🍗"],[/beef|steak|chuck/,"🥩"],[/pork|bacon/,"🍖"],[/salmon|tilapia|fish|cod|tuna/,"🐟"],[/shrimp|prawn/,"🍤"],
+  [/pasta|spaghetti|noodle|linguin|ramen|udon/,"🍝"],[/\brice\b/,"🍚"],[/\begg/,"🍳"],[/potato/,"🥔"],[/tofu/,"🥢"],
+  [/lettuce|spinach|cabbage|kale/,"🥗"],[/flour/,"🍞"],[/chocolate|cocoa/,"🍫"],
+];
+const ICON_CHOICES=["🍗","🥩","🍖","🥓","🍤","🐟","🍣","🍙","🍱","🍚","🍛","🍜","🍝","🥟","🍲","🥣","🥗","🥙","🌮","🌯","🍕","🍔","🌭","🥪","🍟","🥔","🍳","🥞","🧇","🍞","🥐","🥯","🥑","🥦","🥬","🍆","🍄","🥢","🧆","🫕","🍰","🧁","🍪","🥧","🍮","🍫","🍨","🍩","🍯","🍑","🍓","🫐","🍌","🥭","🍎","🍋","🥛","☕","🍵","🥤","🍽️"];
+const DEFAULT_ICON="🍽️";
+const plainText=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+function autoIcon(r){
+  const n=plainText(r.name);
+  for(const[re,e]of ICON_RULES)if(re.test(n))return e;
+  const ings=(r.ingredients||[]).filter(i=>!/\boptional\b/i.test(i.note||"")).slice(0,4).map(i=>plainText(i.name));
+  for(const ing of ings)for(const[re,e]of ING_ICONS)if(re.test(ing))return e;
+  return DEFAULT_ICON;
+}
+const recipeIcon=r=>(r.icon&&String(r.icon).trim())||autoIcon(r);
+let iconServer=true; // false when the sheet's Code.gs predates the Icon column
+function sheetIconPick(){
+  const r=S.recipes.find(x=>x.id===sheet.id);if(!r){setTimeout(closeSheet,0);return"";}
+  const cur=(r.icon||"").trim(),auto=autoIcon(r);
+  return head("Choose an icon",`<span>${esc(r.name)}</span>`)+`<div class="stack">
+    <button class="btn ${cur?"":"primary"}" data-act="setIcon" data-icon="">${auto} Automatic${cur?"":" (current)"}</button>
+    <div class="icongrid">${ICON_CHOICES.map(e=>`<button class="iconopt" data-act="setIcon" data-icon="${e}" aria-pressed="${cur===e}" aria-label="Use ${e}">${e}</button>`).join("")}</div>
+    ${iconServer?"":`<p class="scanhint" style="margin:0">To keep your choice, update Code.gs in Apps Script. Until then it resets on the next sync.</p>`}
+  </div>`;
+}
+
 /* ---------- recipes view ---------- */
 function renderRecipes(){
   const el=$("#rList");if(!el)return;
@@ -448,7 +548,7 @@ function renderRecipes(){
   if(!rows.length){el.innerHTML=`<div class="empty"><strong>No recipes yet</strong>Tap <b>+ New</b> and paste the ingredient list, or add rows to the Recipes tab in your sheet.</div>`;return;}
   if(!shown.length){el.innerHTML=rFilter==="all"?`<div class="empty"><strong>No finished recipes yet</strong>Your recipes are all drafts. Open one under <b>Drafts</b> and add its ingredients.</div>`:`<div class="empty"><strong>${rFilter==="ready"?"Nothing ready to cook":"No recipes here"}</strong>${rFilter==="ready"?"Check 1–2 away for recipes that only need a quick shop.":"Try another filter."}</div>`;return;}
   el.innerHTML=shown.map(({r,st,d})=>{
-    const name=`<span class="rname">${esc(r.name)}${r.example?'<span class="tag">Example</span>':""}</span>`;
+    const name=`<span class="rtitle"><span class="ricon" aria-hidden="true">${recipeIcon(r)}</span><span class="rname">${esc(r.name)}${r.example?'<span class="tag">Example</span>':""}</span></span>`;
     if(d)return`<button class="rcard draft" data-act="openRecipe" data-id="${esc(r.id)}"><span class="rhead">${name}<span class="pill draft">Draft</span></span><span class="meter">${st.rows.length?`${st.rows.length} ingredient${st.rows.length>1?"s":""} so far`:"No ingredients yet"}</span></button>`;
     const pill=st.status==="ready"?`<span class="pill ready">Ready</span>`:`<span class="pill ${st.status}">Need ${st.miss}</span>`;
     const slots=st.rows.slice(0,8).map(x=>`<span class="slot ${x.s}">${esc(x.ing.name)}</span>`).join("")+(st.rows.length>8?`<span class="slot more">+${st.rows.length-8} more</span>`:"");
@@ -503,6 +603,7 @@ function renderSheet(first){
   if(sheet.type==="recipe")b.innerHTML=sheetRecipe();
   else if(sheet.type==="editRecipe"){b.innerHTML=sheetEditRecipe();bindRecipeForm();}
   else if(sheet.type==="editItem"){b.innerHTML=sheetEditItem();bindItemForm();}
+  else if(sheet.type==="iconPick")b.innerHTML=sheetIconPick();
   else if(sheet.type==="scan"){b.innerHTML=sheetScan();startScan();}
   else if(sheet.type==="scanResult"){b.innerHTML=sheetScanResult();bindScanResult();}
   else if(sheet.type==="text")b.innerHTML=head("Grocery list")+`<div class="stack"><p style="margin:0;color:var(--muted)">Select all and copy, then paste into a message.</p><textarea class="textout" readonly id="txtOut">${esc(sheet.text)}</textarea></div>`;
@@ -532,7 +633,7 @@ function sheetRecipe(){
   const cookBtn=st.status==="empty"?"":`<button class="btn ${st.status==="ready"?"primary":""} wide" data-act="cook">${st.status==="ready"?"Cook it":"Cook anyway"}</button>`;
   const steps=String(r.steps||"").split(/\n+/).map(s=>s.replace(/^\s*(\d+[.)]|step \d+:?|[-*•])\s*/i,"").trim()).filter(Boolean);
   const meta=[r.link&&/^https?:\/\//i.test(r.link)?`<a href="${esc(r.link)}" target="_blank" rel="noopener">Original recipe ↗</a>`:"",r.lastCooked?`Last cooked ${esc(new Date(r.lastCooked).toLocaleDateString(undefined,{month:"short",day:"numeric"}))}`:""].filter(Boolean).join(" · ");
-  return head(esc(r.name)+(r.example?'<span class="tag">Example</span>':""),pill+(noIng?"":`<span>${st.have} of ${st.total} ingredients${st.opt?` · ${st.opt} optional`:""}</span>`))+
+  return head(`<button class="iconbtn" data-act="pickIcon" aria-label="Change icon" title="Change icon">${recipeIcon(r)}</button>`+esc(r.name)+(r.example?'<span class="tag">Example</span>':""),pill+(noIng?"":`<span>${st.have} of ${st.total} ingredients${st.opt?` · ${st.opt} optional`:""}</span>`))+
   `<div class="stack">
     ${draftBar}
     <div class="serv"><span>Servings${scale!==1?` <span style="color:var(--muted)">(recipe makes ${base})</span>`:""}</span><div class="stepper"><button data-act="serv" data-d="-1" aria-label="Fewer servings">−</button><span>${serv}</span><button data-act="serv" data-d="1" aria-label="More servings">+</button></div></div>
@@ -841,6 +942,8 @@ document.addEventListener("click",async e=>{
     case"torch":toggleTorch();break;
     case"pk":{if(!sheet||sheet.type!=="scanResult")break;sheet.pk=Math.max(1,(sheet.pk||1)+ +t.dataset.d);const el=$("#sPk");if(el)el.textContent=sheet.pk;break;}
     case"useName":{const i=$("#sName");if(i){i.value=t.dataset.name;updateScanMatch();}break;}
+    case"pickIcon":if(sheet&&sheet.type==="recipe")openSheet({type:"iconPick",id:sheet.id});break;
+    case"setIcon":{const id2=sheet&&sheet.id;if(!id2)break;await store.update("recipes",id2,{icon:t.dataset.icon});openSheet({type:"recipe",id:id2});break;}
     case"setDraft":{if(!r)break;const v=t.dataset.v==="1";await store.update("recipes",r.id,{draft:v});toast(v?"Moved to drafts":"Recipe marked finished");renderSheet();break;}
     case"delRecipe":{const rid=sheet.id;closeSheet();await store.del("recipes",rid);toast("Recipe deleted");break;}
     case"serv":{if(!r)break;const base=Math.max(1,+r.servings||1);sheet.servings=Math.max(1,(sheet.servings||base)+ +t.dataset.d);renderSheet();break;}
