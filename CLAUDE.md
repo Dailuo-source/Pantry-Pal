@@ -22,7 +22,7 @@ Gary's groceries + recipes app. The pantry works like a game crafting system: ea
 
 ## Changing things
 
-- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (currently `pantry-pal-v9`), commit and push to `main`. GitHub Pages serves it within a few minutes; the service worker fetches with `cache: 'no-cache'` so phones pick it up.
+- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (currently `pantry-pal-v10`), commit and push to `main`. GitHub Pages serves it within a few minutes; the service worker fetches with `cache: 'no-cache'` so phones pick it up.
 - **Code.gs**: Gary pastes it into Apps Script, saves, then **Deploy → Manage deployments → pencil → Version: New version → Deploy**. The URL stays the same. Claude can also do this in Gary's Chrome with Claude in Chrome: set the Monaco model's value from the raw GitHub file, Ctrl+S, then redeploy.
 - Commits use author `Claude <noreply@anthropic.com>`; GitHub rejects Gary's private email.
 

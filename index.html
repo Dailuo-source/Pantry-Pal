@@ -127,8 +127,17 @@ label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weigh
 .stock{border:1px solid var(--line);background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:6px 12px;font-weight:700;font-size:12.5px;cursor:pointer;flex:none;min-width:62px}
 .stock.off{background:var(--bad-soft);color:var(--bad)}
 .tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 4px;margin-left:6px;vertical-align:2px;white-space:nowrap}
-.lrow{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-top:1px solid var(--line);min-height:54px}
+.lrow{display:flex;align-items:center;gap:2px;padding:4px 6px 4px 2px;border-top:1px solid var(--line);min-height:54px}
+.lcheck{width:46px;height:46px;flex:none;display:grid;place-items:center;background:none;border:0;cursor:pointer;padding:0;border-radius:10px}
 .lmain{flex:1;min-width:0;cursor:pointer;background:none;border:0;text-align:left;display:flex;align-items:center;gap:12px;padding:8px 0}
+.lplus{display:inline-block;margin-left:6px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:1px 8px;vertical-align:1px;white-space:nowrap}
+.lrow.done .lqty{color:var(--ok)}
+.addhint{font-size:13px;color:var(--muted);margin:-8px 2px 0;min-height:18px}
+.addhint b{color:var(--ink);font-weight:600}
+.qchips{display:flex;gap:6px;flex-wrap:wrap}
+.qstep{display:flex;align-items:center;gap:8px}
+.qstep button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:20px;line-height:1;cursor:pointer;flex:none}
+.qstep input{text-align:center;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
 .check{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);flex:none;display:grid;place-items:center;color:transparent}
 .lrow.done .check{background:var(--ok);border-color:var(--ok);color:var(--surface)}
 .ltext{min-width:0;display:flex;flex-direction:column}
@@ -440,7 +449,7 @@ function render(msg){
   $("#title").textContent={recipes:"What can I make?",pantry:"Pantry",list:"Grocery list"}[tab];
   if(tab==="recipes")v.innerHTML=`<div id="exNote"></div><div class="toolbar"><div class="chips" id="rFilters" role="group" aria-label="Filter recipes"></div><button class="btn small primary" data-act="newRecipe">+ New</button></div><div id="rList" class="cards"></div><div class="sheetlink" id="sheetLink"></div>`;
   else if(tab==="pantry")v.innerHTML=`<form id="pantryAdd" class="addbar" autocomplete="off"><input id="pantryInput" placeholder="Add or find, e.g. 6 eggs" aria-label="Add or find a pantry item" value="${esc(pFilter)}"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("pantry")}</form><div id="exNote"></div><div id="pList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
-  else v.innerHTML=`<form id="listAdd" class="addbar" autocomplete="off"><input id="listInput" placeholder="Add item, e.g. 2 L milk" aria-label="Add a grocery item"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("list")}</form><div id="lList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
+  else v.innerHTML=`<form id="listAdd" class="addbar" autocomplete="off"><input id="listInput" placeholder="Add item, e.g. 2 L milk" aria-label="Add a grocery item"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("list")}</form><div id="listHint" class="addhint" aria-live="polite">Type the amount first, like "2 L milk" or "6 eggs".</div><div id="lList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
   refresh();
 }
 function onData(){if(auth!=="ok")return;refresh();if(sheet&&sheet.type==="recipe")renderSheet();}
@@ -609,18 +618,18 @@ function renderList(){
   if(!ready){el.innerHTML=loadingHTML;return;}
   const open=S.list.filter(l=>!l.checked),done=S.list.filter(l=>l.checked);
   if(!S.list.length){el.innerHTML=`<div class="empty"><strong>Your list is empty</strong>Add items above, or open a recipe and tap <b>Add missing to list</b>.</div>`;return;}
-  const row=l=>`<div class="lrow ${l.checked?"done":""}"><button class="lmain" data-act="toggleList" data-id="${esc(l.id)}" aria-pressed="${!!l.checked}"><span class="check"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="ltext"><span><span class="lname">${esc(l.name)}</span>${l.qty!=null?` <span class="lqty">· ${esc(qtyText(l.qty,l.unit))}</span>`:""}</span>${(l.for||[]).length?`<span class="lfor">For ${esc(l.for.join(", "))}</span>`:""}</span></button><button class="x" data-act="delList" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></div>`;
+  const row=l=>`<div class="lrow ${l.checked?"done":""}"><button class="lcheck" data-act="toggleList" data-id="${esc(l.id)}" aria-pressed="${!!l.checked}" aria-label="${l.checked?"Take "+esc(l.name)+" out of the cart":"Put "+esc(l.name)+" in the cart"}"><span class="check"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button><button class="lmain" data-act="editList" data-id="${esc(l.id)}" aria-label="Edit ${esc(l.name)}"><span class="ltext"><span><span class="lname">${esc(l.name)}</span>${l.qty!=null?` <span class="lqty">· ${l.checked?"got ":""}${esc(qtyText(l.qty,l.unit))}</span>`:`<span class="lplus">+ amount</span>`}</span>${(l.for||[]).length?`<span class="lfor">For ${esc(l.for.join(", "))}</span>`:""}</span></button><button class="x" data-act="delList" data-id="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></div>`;
   const catOf=l=>{const it=findItem(l.name);return it&&CATS.includes(it.category)?it.category:guessCat(l.name);};
   const groups={};open.forEach(l=>{const c=catOf(l);(groups[c]=groups[c]||[]).push(l);});
   let h=CATS.filter(c=>groups[c]).map(c=>`<section class="group"><h3>${esc(c)}<span>${groups[c].length}</span></h3><div class="rows">${groups[c].sort((a,b)=>String(a.name).localeCompare(b.name)).map(row).join("")}</div></section>`).join("");
   if(!open.length)h+=`<div class="empty"><strong>Everything's in the cart</strong>Put it away to update your pantry.</div>`;
-  if(done.length)h+=`<section class="group"><h3>In the cart<span>${done.length}</span></h3><div class="rows">${done.map(row).join("")}</div><div class="bar-actions" style="margin-top:6px"><button class="btn primary wide" data-act="putAway">Put ${done.length} away in pantry</button><button class="btn" data-act="clearDone" data-confirm="Tap again">Remove</button></div></section>`;
+  if(done.length)h+=`<section class="group"><h3>In the cart<span>${done.length}</span></h3><p style="margin:0 2px;font-size:12.5px;color:var(--muted)">Tap an item to change how much you got.</p><div class="rows">${done.map(row).join("")}</div><div class="bar-actions" style="margin-top:6px"><button class="btn primary wide" data-act="putAway">Put ${done.length} away in pantry</button><button class="btn" data-act="clearDone" data-confirm="Tap again">Remove</button></div></section>`;
   if(open.length)h+=`<div class="bar-actions"><button class="btn" data-act="copyList">Copy list as text</button></div>`;
   el.innerHTML=h;
 }
 
 /* ---------- bottom sheet ---------- */
-function openSheet(s){stopScan();sheet=s;$("#sheetWrap").hidden=false;document.body.style.overflow="hidden";renderSheet(true);}
+function openSheet(s){stopScan();clearTimeout(tT);$("#toast").hidden=true;sheet=s;$("#sheetWrap").hidden=false;document.body.style.overflow="hidden";renderSheet(true);}
 function closeSheet(){stopScan();sheet=null;$("#sheetWrap").hidden=true;$("#sheetBody").innerHTML="";document.body.style.overflow="";}
 function head(title,sub){return`<div class="sheet-h"><div style="min-width:0"><h2 id="sheetTitle">${title}</h2>${sub?`<div class="sub">${sub}</div>`:""}</div><button class="close" data-act="close" aria-label="Close">×</button></div>`;}
 function renderSheet(first){
@@ -628,6 +637,7 @@ function renderSheet(first){
   if(sheet.type==="recipe")b.innerHTML=sheetRecipe();
   else if(sheet.type==="editRecipe"){b.innerHTML=sheetEditRecipe();bindRecipeForm();}
   else if(sheet.type==="editItem"){b.innerHTML=sheetEditItem();bindItemForm();}
+  else if(sheet.type==="editList"){b.innerHTML=sheetEditList();bindListForm();}
   else if(sheet.type==="iconPick")b.innerHTML=sheetIconPick();
   else if(sheet.type==="scan"){b.innerHTML=sheetScan();startScan();}
   else if(sheet.type==="scanResult"){b.innerHTML=sheetScanResult();bindScanResult();}
@@ -716,6 +726,31 @@ function bindItemForm(){
     const data={name,staple:st.checked,inStock:$("#iStock").checked,qty:Math.max(0,round2(parseFloat($("#iQty").value)||0)),unit:$("#iUnit").value,category:$("#iCat").value,example:false};
     delete pendQ[id];clearTimeout(pendT[id]);
     await store.update("items",id,data);toast(`Saved ${name}`);closeSheet();
+  });
+}
+
+function sheetEditList(){
+  const l=S.list.find(x=>x.id===sheet.id);
+  if(!l){setTimeout(closeSheet,0);return"";}
+  const got=l.checked;const u=l.unit||"pcs";
+  return head(got?`How much ${esc(l.name)} did you get?`:`Edit ${esc(l.name)}`,got?"In the cart. This amount goes to your pantry when you put it away.":"On your grocery list")+`<form id="listForm">
+    <label class="field">Name<input id="lName" required value="${esc(l.name)}"></label>
+    <div class="row2"><div class="field"><span>${got?"Amount you got":"Amount to buy"}</span><div class="qstep"><button type="button" data-act="lStep" data-d="-1" aria-label="Less">−</button><input id="lQty" type="number" step="any" min="0" inputmode="decimal" placeholder="Any" aria-label="Amount" value="${l.qty!=null?esc(l.qty):""}"><button type="button" data-act="lStep" data-d="1" aria-label="More">+</button></div></div>
+    <label class="field">Unit<select id="lUnit">${UNITS.map(x=>`<option value="${x}" ${u===x?"selected":""}>${x==="l"?"L":x}</option>`).join("")}</select></label></div>
+    <p style="margin:-4px 0 0;font-size:12.5px;color:var(--muted)">Leave the amount empty if it doesn't matter.</p>
+    <div class="actions"><button class="btn primary wide" type="submit">Save</button><button class="btn wide" type="button" data-act="toggleListSheet">${got?"Back on the list":"Put in the cart"}</button></div>
+    <div class="foot"><span></span><button class="btn danger" type="button" data-act="delListSheet" data-confirm="Tap again to remove">Remove from list</button></div>
+  </form>`;
+}
+function readListForm(){
+  const name=$("#lName").value.trim();const raw=$("#lQty").value.trim();const q=parseFloat(raw.replace(",","."));
+  const qty=raw===""||!(q>0)?null:round2(q);
+  return{name:name?cap(name):null,qty,unit:qty==null?"":$("#lUnit").value};
+}
+function bindListForm(){
+  $("#listForm").addEventListener("submit",async e=>{
+    e.preventDefault();const id=sheet.id;const d=readListForm();if(!d.name)return;
+    await store.update("list",id,d);toast(`Saved ${d.name}${d.qty!=null?" · "+qtyText(d.qty,d.unit):""}`);closeSheet();
   });
 }
 
@@ -980,7 +1015,12 @@ document.addEventListener("click",async e=>{
     case"step":stepItem(id,+t.dataset.d);break;
     case"toggleStock":{const it=S.items.find(x=>x.id===id);if(it)await store.update("items",id,{inStock:it.inStock===false});break;}
     case"itemToList":{const it=S.items.find(x=>x.id===id);if(!it)break;t.disabled=true;await addToList(it.name,null,"",null);toast(`Added ${it.name} to your grocery list`);if(sheet&&sheet.type==="editItem")closeSheet();break;}
-    case"toggleList":{const l=S.list.find(x=>x.id===id);if(l)await store.update("list",id,{checked:!l.checked});break;}
+    case"toggleList":{const l=S.list.find(x=>x.id===id);if(!l)break;const on=!l.checked;await store.update("list",id,{checked:on});
+      if(on)toast(`${l.name} in the cart${l.qty!=null?" · got "+qtyText(l.qty,l.unit):""}`,{label:"Change",fn:()=>openSheet({type:"editList",id})});break;}
+    case"editList":openSheet({type:"editList",id});break;
+    case"lStep":{const inp=$("#lQty");if(!inp)break;const st=STEP[$("#lUnit").value]||1;const cur=parseFloat(inp.value)||0;inp.value=Math.max(0,round2(cur+ +t.dataset.d*st))||"";break;}
+    case"toggleListSheet":{const lid=sheet&&sheet.id;const l=S.list.find(x=>x.id===lid);if(!l)break;const d=readListForm();if(!d.name)break;const was=!!l.checked;await store.update("list",lid,Object.assign(d,{checked:!was}));toast(was?`${d.name} back on the list`:`${d.name} in the cart${d.qty!=null?" · got "+qtyText(d.qty,d.unit):""}`);closeSheet();break;}
+    case"delListSheet":{const lid=sheet.id;closeSheet();await store.del("list",lid);toast("Removed from the list");break;}
     case"delList":await store.del("list",id);break;
     case"putAway":t.disabled=true;await putAway();break;
     case"clearDone":for(const l of S.list.filter(x=>x.checked))await store.del("list",l.id);break;
@@ -1002,10 +1042,13 @@ document.addEventListener("submit",async e=>{
   if(id==="scanForm"){e.preventDefault();const b=e.submitter;if(b)b.disabled=true;await submitScan(b&&b.dataset.to||scanDest);if(b&&b.isConnected)b.disabled=false;return;}
   if(id==="listAdd"){
     e.preventDefault();const inp=$("#listInput");const p=parseLine(inp.value);if(!p)return;
-    await addToList(p.name,p.qty,p.qty!=null?p.unit:"",null);inp.value="";
+    await addToList(p.name,p.qty,p.qty!=null?p.unit:"",null);inp.value="";listHint("");
+    toast(`Added ${cap(p.name)}${p.qty!=null?" · "+qtyText(p.qty,p.unit):""}`,p.qty==null?{label:"Add amount",fn:()=>{const l=listEntry(p.name);if(l)openSheet({type:"editList",id:l.id});}}:null);
   }
 });
-document.addEventListener("input",e=>{if(e.target.id==="pantryInput"){pFilter=e.target.value;renderPantry();}});
+const LIST_HINT='Type the amount first, like "2 L milk" or "6 eggs".';
+function listHint(v){const h=$("#listHint");if(!h)return;const p=parseLine(v);if(!p){h.textContent=LIST_HINT;return;}h.innerHTML=`Adds <b>${esc(cap(p.name))}</b> · ${p.qty!=null?esc(qtyText(p.qty,p.unit)):"no amount yet"}`;}
+document.addEventListener("input",e=>{if(e.target.id==="pantryInput"){pFilter=e.target.value;renderPantry();}if(e.target.id==="listInput")listHint(e.target.value);});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sheet)closeSheet();});
 
 boot();
