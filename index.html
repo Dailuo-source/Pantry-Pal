@@ -1069,6 +1069,21 @@ document.addEventListener("change",e=>{
 document.addEventListener("input",e=>{if(e.target.id==="pantryInput"){pFilter=e.target.value;renderPantry();}if(e.target.id==="listInput")listHint(e.target.value);});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sheet)closeSheet();});
 
+/* ---------- phone back button ----------
+   Back closes an open panel, then goes to Recipes, then asks once more before leaving.
+   A spare history entry catches the back press; it's added on a tap so Chrome won't skip it. */
+let backArmed=false,exitAsk=0;
+function armBack(){if(backArmed)return;try{history.pushState({pp:1},"");backArmed=true;}catch(e){}}
+document.addEventListener("pointerdown",armBack,true);
+window.addEventListener("popstate",()=>{
+  backArmed=false;
+  if(sheet){closeSheet();armBack();return;}
+  if(tab!=="recipes"){setTab("recipes");armBack();return;}
+  // Nothing left to go back to: warn once, and leave the next back press to Android for 2.5 s
+  exitAsk=Date.now();toast("Press back again to close Pantry Pal");
+  setTimeout(()=>{if(Date.now()-exitAsk>=2400)armBack();},2500);
+});
+
 boot();
 })();
 </script>
