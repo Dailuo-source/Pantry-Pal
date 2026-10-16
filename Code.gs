@@ -73,6 +73,14 @@ const SCHEMA = {
       ['updated', 'Updated', 'date', 110],
     ],
   },
+  // The unit choices for the app and for the Unit dropdowns in every tab. Add your own here.
+  units: {
+    sheet: 'Units',
+    cols: [
+      ['id', 'ID', 'id', 80],
+      ['name', 'Unit', 'text', 120],
+    ],
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +99,7 @@ function doPost(e) {
 }
 
 /**
- * Request:  { key, ops: [{op: 'add'|'update'|'del', coll: 'items'|'recipes'|'list', id, data}] }
+ * Request:  { key, ops: [{op: 'add'|'update'|'del', coll: 'items'|'recipes'|'list'|'barcodes'|'units', id, data}] }
  * Response: { ok: true, state: {items, recipes, list}, sheetUrl } or { ok: false, error, message }
  * An empty ops list just returns the current state.
  */
@@ -110,6 +118,7 @@ function api(body) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return { ok: false, error: 'busy', message: 'The sheet is busy. Try again in a moment.' };
   try {
+    ensureUnits_(ss_());
     (req.ops || []).forEach(applyOp_);
     SpreadsheetApp.flush();
     return { ok: true, state: readAll_(), sheetUrl: ss_().getUrl() };
@@ -289,6 +298,7 @@ function setup() {
   const props = PropertiesService.getScriptProperties();
   props.setProperty('SHEET_ID', ss.getId());
 
+  ensureUnits_(ss);
   Object.keys(SCHEMA).forEach(function (coll) { buildTab_(ss, SCHEMA[coll]); });
 
   ['Sheet1', 'Sheet 1'].forEach(function (n) {
@@ -403,7 +413,7 @@ function buildTab_(ss, sch) {
     const col = cols[field] + 1;
     const rng = sh.getRange(2, col, body, 1);
     if (type === 'bool') rng.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
-    if (type === 'unit') rng.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(UNITS, true).setAllowInvalid(true).build());
+    if (type === 'unit') rng.setDataValidation(unitRule_(ss));
     if (type === 'section') rng.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(SECTIONS, true).setAllowInvalid(true).build());
     if (type === 'date') rng.setNumberFormat('mmm d, yyyy');
     if (type === 'code') rng.setNumberFormat('@');
@@ -431,6 +441,56 @@ function buildTab_(ss, sch) {
   }
   sh.setConditionalFormatRules(rules);
   return sh;
+}
+
+/* ------------------------------------------------------------------ */
+/* Units tab                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Dropdown rule for Unit columns: whatever is listed in the Units tab. */
+function unitRule_(ss) {
+  const sh = ss.getSheetByName(SCHEMA.units.sheet);
+  const b = SpreadsheetApp.newDataValidation().setAllowInvalid(true);
+  if (!sh) return b.requireValueInList(UNITS, true).build();
+  const cols = headerMap_(sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0], SCHEMA.units);
+  const L = colLetter_((cols.name != null ? cols.name : 1) + 1);
+  return b.requireValueInRange(sh.getRange(L + '2:' + L), true).build();
+}
+
+/**
+ * Creates the Units tab the first time (filled with the standard units plus any
+ * unit already used in your sheet), then points every Unit dropdown at it.
+ */
+function ensureUnits_(ss) {
+  if (ss.getSheetByName(SCHEMA.units.sheet)) return;
+  const seen = {};
+  const names = [];
+  const push = function (u) {
+    u = String(u == null ? '' : u).trim();
+    const k = u.toLowerCase();
+    if (!u || seen[k]) return;
+    seen[k] = true;
+    names.push(u);
+  };
+  UNITS.forEach(push);
+  ['items', 'list', 'barcodes'].forEach(function (coll) {
+    const sh = ss.getSheetByName(SCHEMA[coll].sheet);
+    if (!sh || sh.getLastRow() < 2) return;
+    const cols = headerMap_(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0], SCHEMA[coll]);
+    if (cols.unit == null) return;
+    sh.getRange(2, cols.unit + 1, sh.getLastRow() - 1, 1).getValues().forEach(function (r) { push(r[0]); });
+  });
+  const sh = buildTab_(ss, SCHEMA.units);
+  sh.getRange(2, 1, names.length, 2).setValues(names.map(function (n) { return [newId_(), n]; }));
+  sh.getRange(1, 3).setValue('Add a unit on a new row. It shows up in the app and in every Unit dropdown.').setFontStyle('italic').setFontColor('#4D5853');
+  // Point the existing Unit columns at the new tab
+  const rule = unitRule_(ss);
+  ['items', 'list', 'barcodes'].forEach(function (coll) {
+    const t = ss.getSheetByName(SCHEMA[coll].sheet);
+    if (!t || t.getLastColumn() < 1) return;
+    const cols = headerMap_(t.getRange(1, 1, 1, t.getLastColumn()).getValues()[0], SCHEMA[coll]);
+    if (cols.unit != null) t.getRange(2, cols.unit + 1, t.getMaxRows() - 1, 1).setDataValidation(rule);
+  });
 }
 
 function seedExamples_(ss) {

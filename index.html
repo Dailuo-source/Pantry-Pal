@@ -273,16 +273,21 @@ const round2=n=>Math.round(n*100)/100;
 const UNITS=["pcs","g","kg","ml","l","tsp","tbsp","cup","lb","oz","clove","can","bunch","pack","slice"];
 // Canadian metric cup (250 ml), tbsp 15 ml, tsp 5 ml
 const CONV={g:["m",1],kg:["m",1000],lb:["m",453.6],oz:["m",28.35],ml:["v",1],l:["v",1000],tsp:["v",5],tbsp:["v",15],cup:["v",250]};
-const COUNTISH=new Set(["pcs","clove","can","bunch","pack","slice",""]);
+const isCount=u=>!CONV[u||""];
 const ALIAS={g:"g",gram:"g",grams:"g",gr:"g",kg:"kg",kgs:"kg",kilo:"kg",kilos:"kg",kilogram:"kg",kilograms:"kg",ml:"ml",millilitre:"ml",milliliter:"ml",millilitres:"ml",milliliters:"ml",l:"l",litre:"l",liter:"l",litres:"l",liters:"l",tsp:"tsp",teaspoon:"tsp",teaspoons:"tsp",tbsp:"tbsp",tbs:"tbsp",tablespoon:"tbsp",tablespoons:"tbsp",cup:"cup",cups:"cup",lb:"lb",lbs:"lb",pound:"lb",pounds:"lb",oz:"oz",ounce:"oz",ounces:"oz",clove:"clove",cloves:"clove",can:"can",cans:"can",tin:"can",tins:"can",bunch:"bunch",bunches:"bunch",pack:"pack",packs:"pack",package:"pack",packages:"pack",pkg:"pack",pcs:"pcs",pc:"pcs",piece:"pcs",pieces:"pcs",slice:"slice",slices:"slice"};
 const STEP={g:50,kg:.25,ml:100,l:.25,lb:.5,oz:1,cup:.5,tbsp:1,tsp:1};
 function convert(q,from,to){from=from||"";to=to||"";if(from===to||((from==="pcs"||from==="")&&(to==="pcs"||to==="")))return q;const a=CONV[from],b=CONV[to];if(!a||!b||a[0]!==b[0])return null;return q*a[1]/b[1];}
 const FR=[[.25,"¼"],[.5,"½"],[.75,"¾"],[1/3,"⅓"],[2/3,"⅔"]];
-function fmtNum(q,unit){if(q==null)return"";if(["tsp","tbsp","cup","pcs","","clove","can","bunch","pack","slice"].includes(unit||"")){const w=Math.floor(q+1e-9),f=q-w;if(f<.02)return String(w);for(const[v,g]of FR){if(Math.abs(f-v)<.02)return(w?w:"")+g;}}if(q>=10)return String(Math.round(q*10)/10);return String(round2(q));}
-function unitLabel(u,q){if(!u||u==="pcs")return"";if(["clove","can","pack","slice"].includes(u)&&q!==1)return u+"s";if(u==="bunch"&&q!==1)return"bunches";if(u==="l")return"L";return u;}
+function fmtNum(q,unit){if(q==null)return"";if(isCount(unit)||["tsp","tbsp","cup"].includes(unit)){const w=Math.floor(q+1e-9),f=q-w;if(f<.02)return String(w);for(const[v,g]of FR){if(Math.abs(f-v)<.02)return(w?w:"")+g;}}if(q>=10)return String(Math.round(q*10)/10);return String(round2(q));}
+function unitLabel(u,q){if(!u||u==="pcs")return"";if(u==="l")return"L";if(CONV[u]||q===1||/s$/.test(u))return u;return/(x|ch|sh)$/.test(u)?u+"es":u+"s";}
 function qtyText(q,u){if(q==null)return"";const n=fmtNum(q,u),l=unitLabel(u,q);return l?n+" "+l:n;}
-function roundShort(q,u){if(q==null)return null;if(COUNTISH.has(u||"")||u==="g"||u==="ml"||u==="oz")return Math.ceil(q-1e-9);if(u==="tsp"||u==="tbsp"||u==="cup")return Math.ceil(q*4-1e-9)/4;return Math.ceil(q*100-1e-9)/100;}
+function roundShort(q,u){if(q==null)return null;if(isCount(u)||u==="g"||u==="ml"||u==="oz")return Math.ceil(q-1e-9);if(u==="tsp"||u==="tbsp"||u==="cup")return Math.ceil(q*4-1e-9)/4;return Math.ceil(q*100-1e-9)/100;}
 function normUnit(u,def){u=String(u==null?"":u).trim().toLowerCase().replace(/\.$/,"");return ALIAS[u]||(u||def);}
+/* units from the sheet's Units tab (falls back to the built-in list) */
+let unitsServer=false;
+function unitList(){const seen=new Set(),out=[];const add=u=>{u=normUnit(u,"");if(u&&!seen.has(u)){seen.add(u);out.push(u);}};((S.units||[]).length?S.units.map(x=>x.name):UNITS).forEach(add);return out;}
+function unitWord(w){w=String(w||"").toLowerCase();if(ALIAS[w])return ALIAS[w];const L=unitList();if(L.includes(w))return w;for(const u of L){if(w===u+"s"||w===u+"es")return u;}return"";}
+function unitOptions(cur){const L=unitList();cur=cur||"pcs";if(!L.includes(cur))L.unshift(cur);return L.map(u=>`<option value="${esc(u)}" ${u===cur?"selected":""}>${u==="l"?"L":esc(u)}</option>`).join("")+(unitsServer?`<option value="__new">+ New unit…</option>`:"");}
 
 /* ---------- parsing ---------- */
 const UF={"½":.5,"¼":.25,"¾":.75,"⅓":1/3,"⅔":2/3,"⅛":.125};
@@ -296,7 +301,7 @@ function parseLine(line){
   else if((m=s.match(/^([½¼¾⅓⅔⅛])/))){qty=UF[m[1]];}
   if(m)s=s.slice(m[0].length).trim();
   let unit="";
-  if(qty!=null){const um=s.match(/^([a-zA-Z]+)\.?(?=\s|$)/);if(um&&ALIAS[um[1].toLowerCase()]){unit=ALIAS[um[1].toLowerCase()];s=s.slice(um[0].length).trim();}if(!unit)unit="pcs";}
+  if(qty!=null){const um=s.match(/^([a-zA-Z]+)\.?(?=\s|$)/);const uw=um?unitWord(um[1]):"";if(uw&&s.slice(um[0].length).trim()){unit=uw;s=s.slice(um[0].length).trim();}if(!unit)unit="pcs";}
   s=s.replace(/^of\s+/i,"");
   let note="";
   const pm=s.match(/\(([^)]*)\)/);if(pm){note=pm[1].trim();s=s.replace(pm[0]," ");}
@@ -328,7 +333,7 @@ function guessCat(name){const n=" "+String(name||"").toLowerCase()+" ";for(const
    ===================================================================== */
 const isGAS=!!(window.google&&google.script&&google.script.run);
 const COLLS=["items","recipes","list","barcodes"];
-let S={items:[],recipes:[],list:[],barcodes:[]};
+let S={items:[],recipes:[],list:[],barcodes:[],units:[]};
 let barcodeServer=true; // false when the sheet's Code.gs predates the Barcodes tab
 let ready=false,auth="ok",KEY="",sheetUrl="",lastSync=0,syncState="connecting";
 let queue=[],inflight=false,flushT=null,retryT=null;
@@ -357,7 +362,8 @@ function normalize(st){
     items:(st.items||[]).map(r=>Object.assign({},r,{qty:+r.qty||0,unit:normUnit(r.unit,"pcs"),staple:!!r.staple,inStock:!!r.inStock})),
     recipes:(st.recipes||[]).map(r=>Object.assign({},r,{draft:!!r.draft,servings:Math.max(1,+r.servings||1),ingredients:Array.isArray(r.ingredients)?r.ingredients:String(r.ingredients||"").split(/\n/).map(parseLine).filter(Boolean)})),
     list:(st.list||[]).map(r=>Object.assign({},r,{qty:r.qty==null||r.qty===""?null:+r.qty,unit:normUnit(r.unit,""),for:Array.isArray(r.for)?r.for:String(r.for||"").split(",").map(s=>s.trim()).filter(Boolean),checked:!!r.checked})),
-    barcodes:(st.barcodes||[]).map(r=>Object.assign({},r,{code:String(r.code||""),qty:r.qty==null||r.qty===""?null:+r.qty,unit:normUnit(r.unit,"pcs")}))
+    barcodes:(st.barcodes||[]).map(r=>Object.assign({},r,{code:String(r.code||""),qty:r.qty==null||r.qty===""?null:+r.qty,unit:normUnit(r.unit,"pcs")})),
+    units:(st.units||[]).filter(r=>String(r.name||"").trim())
   };
 }
 async function flush(){
@@ -372,6 +378,7 @@ async function flush(){
     queue=queue.slice(ops.length);
     if(res.sheetUrl){sheetUrl=res.sheetUrl;try{localStorage.setItem("pc.sheet",sheetUrl);}catch(e){}}
     barcodeServer=!!(res.state&&Array.isArray(res.state.barcodes));
+    unitsServer=!!(res.state&&Array.isArray(res.state.units));
     iconServer=!!(res.state&&(res.state.recipes||[]).some(r=>"icon" in r));
     S=normalize(res.state);queue.forEach(applyLocal);
     const first=!ready;ready=true;lastSync=Date.now();setSync("ok");
@@ -712,7 +719,7 @@ function sheetEditItem(){
   return head("Edit item")+`<form id="itemForm">
     <label class="field">Name<input id="iName" required value="${esc(it.name)}"></label>
     <label class="switch"><input type="checkbox" id="iStaple" ${it.staple?"checked":""}> Staple. Just track whether I have it.</label>
-    <div class="row2" id="iQtyRow"><label class="field">Amount<input id="iQty" type="number" step="any" min="0" inputmode="decimal" value="${esc(effQty(it))}"></label><label class="field">Unit<select id="iUnit">${UNITS.map(u=>`<option value="${u}" ${(it.unit||"pcs")===u?"selected":""}>${u==="l"?"L":u}</option>`).join("")}</select></label></div>
+    <div class="row2" id="iQtyRow"><label class="field">Amount<input id="iQty" type="number" step="any" min="0" inputmode="decimal" value="${esc(effQty(it))}"></label><label class="field">Unit<select id="iUnit" class="unitsel">${unitOptions(it.unit)}</select></label></div>
     <label class="switch" id="iStockRow"><input type="checkbox" id="iStock" ${it.inStock!==false?"checked":""}> In stock</label>
     <label class="field">Section<select id="iCat">${CATS.map(c=>`<option ${(CATS.includes(it.category)?it.category:guessCat(it.name))===c?"selected":""}>${esc(c)}</option>`).join("")}</select></label>
     <div class="actions"><button class="btn primary wide" type="submit">Save</button>${listEntry(it.name)?`<button class="btn wide" type="button" disabled>On grocery list</button>`:`<button class="btn wide" type="button" data-act="itemToList" data-id="${esc(it.id)}">Add to grocery list</button>`}</div>
@@ -736,7 +743,7 @@ function sheetEditList(){
   return head(got?`How much ${esc(l.name)} did you get?`:`Edit ${esc(l.name)}`,got?"In the cart. This amount goes to your pantry when you put it away.":"On your grocery list")+`<form id="listForm">
     <label class="field">Name<input id="lName" required value="${esc(l.name)}"></label>
     <div class="row2"><div class="field"><span>${got?"Amount you got":"Amount to buy"}</span><div class="qstep"><button type="button" data-act="lStep" data-d="-1" aria-label="Less">−</button><input id="lQty" type="number" step="any" min="0" inputmode="decimal" placeholder="Any" aria-label="Amount" value="${l.qty!=null?esc(l.qty):""}"><button type="button" data-act="lStep" data-d="1" aria-label="More">+</button></div></div>
-    <label class="field">Unit<select id="lUnit">${UNITS.map(x=>`<option value="${x}" ${u===x?"selected":""}>${x==="l"?"L":x}</option>`).join("")}</select></label></div>
+    <label class="field">Unit<select id="lUnit" class="unitsel">${unitOptions(u)}</select></label></div>
     <p style="margin:-4px 0 0;font-size:12.5px;color:var(--muted)">Leave the amount empty if it doesn't matter.</p>
     <div class="actions"><button class="btn primary wide" type="submit">Save</button><button class="btn wide" type="button" data-act="toggleListSheet">${got?"Back on the list":"Put in the cart"}</button></div>
     <div class="foot"><span></span><button class="btn danger" type="button" data-act="delListSheet" data-confirm="Tap again to remove">Remove from list</button></div>
@@ -941,7 +948,7 @@ function sheetScanResult(){
     <label class="field">Name in your pantry<input id="sName" required value="${esc(r.name||"")}" list="pantryNames" placeholder="e.g. Spaghetti"></label>
     <datalist id="pantryNames">${S.items.map(i=>`<option value="${esc(i.name)}"></option>`).join("")}</datalist>
     <div id="sMatch" class="scanhint" aria-live="polite"></div>
-    <div class="row2"><label class="field">Size per package<input id="sQty" type="number" step="any" min="0" inputmode="decimal" value="${r.qty!=null?esc(r.qty):""}" placeholder="1"></label><label class="field">Unit<select id="sUnit">${UNITS.map(u=>`<option value="${u}" ${(r.unit||"pcs")===u?"selected":""}>${u==="l"?"L":u}</option>`).join("")}</select></label></div>
+    <div class="row2"><label class="field">Size per package<input id="sQty" type="number" step="any" min="0" inputmode="decimal" value="${r.qty!=null?esc(r.qty):""}" placeholder="1"></label><label class="field">Unit<select id="sUnit" class="unitsel">${unitOptions(r.unit)}</select></label></div>
     <div class="serv"><span>Packages</span><div class="stepper"><button type="button" data-act="pk" data-d="-1" aria-label="Fewer packages">−</button><span id="sPk">${sheet.pk}</span><button type="button" data-act="pk" data-d="1" aria-label="More packages">+</button></div></div>
     <label class="field">Section<select id="sCat">${CATS.map(c=>`<option ${c===(r.category||guessCat(r.name))?"selected":""}>${esc(c)}</option>`).join("")}</select></label>
     <p class="scanhint" style="margin:0">${r.brand?esc(r.brand)+" · ":""}Barcode ${esc(r.code)}</p>
@@ -1048,6 +1055,17 @@ document.addEventListener("submit",async e=>{
 });
 const LIST_HINT='Type the amount first, like "2 L milk" or "6 eggs".';
 function listHint(v){const h=$("#listHint");if(!h)return;const p=parseLine(v);if(!p){h.textContent=LIST_HINT;return;}h.innerHTML=`Adds <b>${esc(cap(p.name))}</b> · ${p.qty!=null?esc(qtyText(p.qty,p.unit)):"no amount yet"}`;}
+// "+ New unit…" in any unit dropdown: ask for the name, add it to the sheet's Units tab, select it
+document.addEventListener("focusin",e=>{if(e.target.classList&&e.target.classList.contains("unitsel"))e.target.dataset.prev=e.target.value;});
+document.addEventListener("change",e=>{
+  const sel=e.target;if(!sel.classList||!sel.classList.contains("unitsel")||sel.value!=="__new")return;
+  const raw=window.prompt("New unit (like bag, jar, bottle, box)","");
+  const u=normUnit(String(raw||"").trim().replace(/\s+/g," "),"");
+  if(!u||u==="__new"){sel.value=sel.dataset.prev||"pcs";return;}
+  if(!unitList().includes(u)){store.add("units",{name:u});toast(`Added "${u}" to your units`);}
+  if(![...sel.options].some(o=>o.value===u))sel.querySelector('option[value="__new"]').insertAdjacentHTML("beforebegin",`<option value="${esc(u)}">${esc(u)}</option>`);
+  sel.value=u;sel.dataset.prev=u;
+});
 document.addEventListener("input",e=>{if(e.target.id==="pantryInput"){pFilter=e.target.value;renderPantry();}if(e.target.id==="listInput")listHint(e.target.value);});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sheet)closeSheet();});
 

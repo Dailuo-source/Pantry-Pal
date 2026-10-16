@@ -7,7 +7,7 @@ Gary's groceries + recipes app. The pantry works like a game crafting system: ea
 | Piece | Location |
 | --- | --- |
 | Live app | https://dailuo-source.github.io/Pantry-Pal/ (GitHub Pages from `main` of `Dailuo-source/Pantry-Pal`) |
-| Database | Google Sheet **Pantry Pal**, id `1M16iXq0e-vhhKMZnfMd8rVd-ZvvyMYpD28DEEihUBEw`. Tabs: Pantry, Recipes, Grocery List, Barcodes |
+| Database | Google Sheet **Pantry Pal**, id `1M16iXq0e-vhhKMZnfMd8rVd-ZvvyMYpD28DEEihUBEw`. Tabs: Pantry, Recipes, Grocery List, Barcodes, Units |
 | Backend | Apps Script bound to that sheet. Source of truth is `Code.gs` in this repo (Gary pastes it into Extensions → Apps Script) |
 | API link | `API_URL` near the top of the script in `index.html` (the `/exec` web app URL) |
 | App key | Script Properties `APP_KEY`; each phone remembers it after opening the link from the sheet menu **Pantry Pal → Show app key and link** |
@@ -18,11 +18,12 @@ Gary's groceries + recipes app. The pantry works like a game crafting system: ea
 - `doPost` / `api()` in Code.gs take `{key, ops:[{op:add|update|del, coll, id, data}]}` and return the whole state. Columns are matched by header name, so Gary can reorder columns or add his own (Meal, Cuisine, Difficulty, Cook time…). Rows typed into the sheet get IDs automatically.
 - The app applies changes on screen first, batches them to the sheet every 350 ms, and polls every 60 s while open. POSTs are `text/plain` to avoid CORS preflight.
 - Features: recipe filters (All / Ready / 1–2 away / Need more / Drafts), optional ingredients (`, optional`), staples (have/out only), unit conversion (Canadian cup = 250 ml), cook with undo, grocery list with "put away", barcode scanning (BarcodeDetector + ponyfill, Open Food Facts lookup, saved mappings in the Barcodes tab), drafts (Draft column), and kawaii recipe icons (inline SVGs in `index.html`, auto-picked from the recipe name, choice saved in the Icon column).
+- Units: the **Units** tab is the master list of units. The app's unit dropdowns follow it (falling back to the built-in list on an older Code.gs), "+ New unit…" in any dropdown adds a row there, and every Unit column in the sheet uses it as its dropdown. Code.gs creates the tab on the first request after deploy, seeded with the standard units plus any already used. Units without a metric conversion (bag, jar…) behave like counts.
 - About 80 recipes were imported from Gary's old "Recipes 🍅" sheet.
 
 ## Changing things
 
-- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (currently `pantry-pal-v10`), commit and push to `main`. GitHub Pages serves it within a few minutes; the service worker fetches with `cache: 'no-cache'` so phones pick it up.
+- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (currently `pantry-pal-v11`), commit and push to `main`. GitHub Pages serves it within a few minutes; the service worker fetches with `cache: 'no-cache'` so phones pick it up.
 - **Code.gs**: Gary pastes it into Apps Script, saves, then **Deploy → Manage deployments → pencil → Version: New version → Deploy**. The URL stays the same. Claude can also do this in Gary's Chrome with Claude in Chrome: set the Monaco model's value from the raw GitHub file, Ctrl+S, then redeploy.
 - Commits use author `Claude <noreply@anthropic.com>`; GitHub rejects Gary's private email.
 
