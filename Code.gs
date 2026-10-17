@@ -45,6 +45,10 @@ const SCHEMA = {
       ['example', 'Example', 'bool', 75],
       ['draft', 'Draft', 'bool', 65],
       ['icon', 'Icon', 'text', 55], // blank = the app picks one from the recipe name
+      ['meal', 'Meal', 'text', 130],  // Breakfast, Lunch, Dinner, Dessert… the app filters by it
+      ['cuisine', 'Cuisine', 'text', 110],
+      ['difficulty', 'Difficulty', 'text', 90],
+      ['cookTime', 'Cook time', 'text', 90],
     ],
   },
   list: {

@@ -211,6 +211,10 @@ label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weigh
 .ricon svg{width:34px;height:34px;display:block}
 .ricon.lg{width:48px;height:48px;border-radius:14px}.ricon.lg svg{width:40px;height:40px}
 .ricon.sm{width:30px;height:30px;border-radius:9px}.ricon.sm svg{width:24px;height:24px}
+.rmeta{display:block;font-size:12.5px;color:var(--muted);margin-top:6px}
+.chips.meals .chip[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.mealpick{display:flex;gap:6px;flex-wrap:wrap}
+.mealpick .chip.add{border-style:dashed}
 .rcard.draft .ricon{opacity:.55;filter:grayscale(.35)}
 .iconbtn{padding:0;border:0;background:none;cursor:pointer;margin-right:10px;vertical-align:middle;display:inline-grid;border-radius:14px}
 .autoicon{justify-content:flex-start}
@@ -445,7 +449,15 @@ const isDraft=r=>!!r.draft||!(r.ingredients||[]).length;
 function listEntry(name){const n=norm(name);return S.list.find(l=>!l.checked&&norm(l.name)===n)||null;}
 
 /* ---------- UI state ---------- */
-let tab="recipes",rFilter="all",sheet=null,pFilter="";
+let tab="recipes",rFilter="all",mFilter="all",sheet=null,pFilter="";
+try{mFilter=localStorage.getItem("pc.meal")||"all";}catch(e){}
+/* meals: Breakfast / Lunch / Dinner / Dessert first, then anything else used in the Meal column */
+const MEALS=["Breakfast","Lunch","Dinner","Dessert"];
+const mealOf=r=>String(r.meal||"").trim();
+function mealList(){const used=new Map();S.recipes.forEach(r=>{const m=mealOf(r);if(m&&!used.has(m.toLowerCase()))used.set(m.toLowerCase(),m);});
+  const out=MEALS.filter(m=>used.has(m.toLowerCase())).map(m=>used.get(m.toLowerCase()));
+  [...used.values()].filter(m=>!MEALS.some(x=>x.toLowerCase()===m.toLowerCase())).sort((a,b)=>a.localeCompare(b)).forEach(m=>out.push(m));return out;}
+const metaLine=r=>[mealOf(r),String(r.difficulty||"").trim(),String(r.cookTime||"").trim()].filter(Boolean).join(" · ");
 function setTab(t){tab=t;try{localStorage.setItem("pc.tab",t);}catch(e){}render();window.scrollTo(0,0);}
 
 function render(msg){
@@ -454,7 +466,7 @@ function render(msg){
   if(auth==="noapi"){$("#title").textContent="Almost there";v.innerHTML=`<div class="connect"><h2>Add your sheet's web app link</h2><p>Open <code>index.html</code>, paste your Apps Script web app URL into <code>API_URL</code> near the top of the script, then publish again.</p></div>`;return;}
   if(auth==="need"){$("#title").textContent="Connect";v.innerHTML=`<div class="connect"><h2>Connect to your sheet</h2><p>Enter the app key from your Pantry Pal sheet. In Google Sheets, open the <b>Pantry Pal</b> menu and choose <b>Show app key and link</b>. This phone remembers it.</p><form id="keyForm" class="addbar" autocomplete="off"><input id="keyInput" placeholder="App key" aria-label="App key" autocapitalize="off" spellcheck="false" value="${esc(KEY)}"><button class="btn primary" type="submit">Connect</button></form>${msg?`<p class="err">${esc(msg)}</p>`:""}</div>`;return;}
   $("#title").textContent={recipes:"What can I make?",pantry:"Pantry",list:"Grocery list"}[tab];
-  if(tab==="recipes")v.innerHTML=`<div id="exNote"></div><div class="toolbar"><div class="chips" id="rFilters" role="group" aria-label="Filter recipes"></div><button class="btn small primary" data-act="newRecipe">+ New</button></div><div id="rList" class="cards"></div><div class="sheetlink" id="sheetLink"></div>`;
+  if(tab==="recipes")v.innerHTML=`<div id="exNote"></div><div class="toolbar"><div class="chips meals" id="mFilters" role="group" aria-label="Filter by meal"></div><button class="btn small primary" data-act="newRecipe">+ New</button></div><div class="chips" id="rFilters" role="group" aria-label="Filter recipes" style="margin-top:-6px"></div><div id="rList" class="cards"></div><div class="sheetlink" id="sheetLink"></div>`;
   else if(tab==="pantry")v.innerHTML=`<form id="pantryAdd" class="addbar" autocomplete="off"><input id="pantryInput" placeholder="Add or find, e.g. 6 eggs" aria-label="Add or find a pantry item" value="${esc(pFilter)}"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("pantry")}</form><div id="exNote"></div><div id="pList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
   else v.innerHTML=`<form id="listAdd" class="addbar" autocomplete="off"><input id="listInput" placeholder="Add item, e.g. 2 L milk" aria-label="Add a grocery item"><button class="btn primary" type="submit">Add</button>${SCAN_BTN("list")}</form><div id="listHint" class="addhint" aria-live="polite">Type the amount first, like "2 L milk" or "6 eggs".</div><div id="lList" class="stackv"></div><div class="sheetlink" id="sheetLink"></div>`;
   refresh();
@@ -575,10 +587,16 @@ function sheetIconPick(){
 /* ---------- recipes view ---------- */
 function renderRecipes(){
   const el=$("#rList");if(!el)return;
-  if(!ready){el.innerHTML=loadingHTML;$("#rFilters").innerHTML="";return;}
+  if(!ready){el.innerHTML=loadingHTML;$("#rFilters").innerHTML="";$("#mFilters").innerHTML="";return;}
   // Drafts (ticked as Draft, or no ingredients yet) live in their own filter and never count as cookable
   const byName=(a,b)=>String(a.r.name).localeCompare(b.r.name);
-  const rows=S.recipes.map(r=>({r,st:stats(r,1),d:isDraft(r)}));
+  const all=S.recipes.map(r=>({r,st:stats(r,1),d:isDraft(r)}));
+  // Meal chips: counts follow the status filter so "Dinner" + "Ready" reads right
+  const meals=mealList();if(mFilter!=="all"&&!meals.includes(mFilter))mFilter="all";
+  const inStatus=x=>rFilter==="drafts"?x.d:!x.d&&(rFilter==="all"||x.st.status===rFilter);
+  const mc=m=>all.filter(x=>inStatus(x)&&mealOf(x.r)===m).length;
+  $("#mFilters").innerHTML=meals.length?[`<button class="chip" data-act="mFilter" data-k="all" aria-pressed="${mFilter==="all"}">All meals</button>`].concat(meals.map(m=>`<button class="chip" data-act="mFilter" data-k="${esc(m)}" aria-pressed="${mFilter===m}">${esc(m)}<span class="n">${mc(m)}</span></button>`)).join(""):"";
+  const rows=mFilter==="all"?all:all.filter(x=>mealOf(x.r)===mFilter);
   const live=rows.filter(x=>!x.d).sort((a,b)=>a.st.miss-b.st.miss||byName(a,b));
   const drafts=rows.filter(x=>x.d).sort(byName);
   const cnt={all:live.length,ready:0,almost:0,need:0,drafts:drafts.length};live.forEach(x=>cnt[x.st.status]++);
@@ -586,15 +604,16 @@ function renderRecipes(){
   if(rFilter==="drafts"&&!cnt.drafts)rFilter="all";
   $("#rFilters").innerHTML=F.map(([k,l])=>`<button class="chip" data-act="rFilter" data-k="${k}" aria-pressed="${rFilter===k}">${l}<span class="n">${cnt[k]}</span></button>`).join("");
   const shown=rFilter==="drafts"?drafts:rFilter==="all"?live:live.filter(x=>x.st.status===rFilter);
+  if(!rows.length&&mFilter!=="all"){el.innerHTML=`<div class="empty"><strong>No ${esc(mFilter.toLowerCase())} recipes</strong>Pick a meal when you edit a recipe, or fill in the Meal column in your sheet.</div>`;return;}
   if(!rows.length){el.innerHTML=`<div class="empty"><strong>No recipes yet</strong>Tap <b>+ New</b> and paste the ingredient list, or add rows to the Recipes tab in your sheet.</div>`;return;}
   if(!shown.length){el.innerHTML=rFilter==="all"?`<div class="empty"><strong>No finished recipes yet</strong>Your recipes are all drafts. Open one under <b>Drafts</b> and add its ingredients.</div>`:`<div class="empty"><strong>${rFilter==="ready"?"Nothing ready to cook":"No recipes here"}</strong>${rFilter==="ready"?"Check 1–2 away for recipes that only need a quick shop.":"Try another filter."}</div>`;return;}
   el.innerHTML=shown.map(({r,st,d})=>{
     const name=`<span class="rtitle">${iconHTML(r,"ricon")}<span class="rname">${esc(r.name)}${r.example?'<span class="tag">Example</span>':""}</span></span>`;
-    if(d)return`<button class="rcard draft" data-act="openRecipe" data-id="${esc(r.id)}"><span class="rhead">${name}<span class="pill draft">Draft</span></span><span class="meter">${st.rows.length?`${st.rows.length} ingredient${st.rows.length>1?"s":""} so far`:"No ingredients yet"}</span></button>`;
+    if(d)return`<button class="rcard draft" data-act="openRecipe" data-id="${esc(r.id)}"><span class="rhead">${name}<span class="pill draft">Draft</span></span>${metaLine(r)?`<span class="rmeta">${esc(metaLine(r))}</span>`:""}<span class="meter">${st.rows.length?`${st.rows.length} ingredient${st.rows.length>1?"s":""} so far`:"No ingredients yet"}</span></button>`;
     const pill=st.status==="ready"?`<span class="pill ready">Ready</span>`:`<span class="pill ${st.status}">Need ${st.miss}</span>`;
     const slots=st.rows.slice(0,8).map(x=>`<span class="slot ${x.s}">${esc(x.ing.name)}</span>`).join("")+(st.rows.length>8?`<span class="slot more">+${st.rows.length-8} more</span>`:"");
     const pct=st.total?Math.round(st.have/st.total*100):100;
-    return`<button class="rcard" data-act="openRecipe" data-id="${esc(r.id)}"><span class="rhead">${name}${pill}</span><span class="slots">${slots}</span><span class="meter"><span class="bar"><i class="${st.status==="ready"?"":"part"}" style="width:${pct}%"></i></span>${st.have} of ${st.total} ingredients${st.opt?` · ${st.opt} optional`:""}</span></button>`;
+    return`<button class="rcard" data-act="openRecipe" data-id="${esc(r.id)}"><span class="rhead">${name}${pill}</span>${metaLine(r)?`<span class="rmeta">${esc(metaLine(r))}</span>`:""}<span class="slots">${slots}</span><span class="meter"><span class="bar"><i class="${st.status==="ready"?"":"part"}" style="width:${pct}%"></i></span>${st.have} of ${st.total} ingredients${st.opt?` · ${st.opt} optional`:""}</span></button>`;
   }).join("");
 }
 
@@ -675,7 +694,7 @@ function sheetRecipe(){
   const cookBtn=st.status==="empty"?"":`<button class="btn ${st.status==="ready"?"primary":""} wide" data-act="cook">${st.status==="ready"?"Cook it":"Cook anyway"}</button>`;
   const steps=String(r.steps||"").split(/\n+/).map(s=>s.replace(/^\s*(\d+[.)]|step \d+:?|[-*•])\s*/i,"").trim()).filter(Boolean);
   const meta=[r.link&&/^https?:\/\//i.test(r.link)?`<a href="${esc(r.link)}" target="_blank" rel="noopener">Original recipe ↗</a>`:"",r.lastCooked?`Last cooked ${esc(new Date(r.lastCooked).toLocaleDateString(undefined,{month:"short",day:"numeric"}))}`:""].filter(Boolean).join(" · ");
-  return head(`<button class="iconbtn" data-act="pickIcon" aria-label="Change icon" title="Change icon">${iconHTML(r,"ricon lg")}</button>`+esc(r.name)+(r.example?'<span class="tag">Example</span>':""),pill+(noIng?"":`<span>${st.have} of ${st.total} ingredients${st.opt?` · ${st.opt} optional`:""}</span>`))+
+  return head(`<button class="iconbtn" data-act="pickIcon" aria-label="Change icon" title="Change icon">${iconHTML(r,"ricon lg")}</button>`+esc(r.name)+(r.example?'<span class="tag">Example</span>':""),pill+(noIng?"":`<span>${st.have} of ${st.total} ingredients${st.opt?` · ${st.opt} optional`:""}</span>`)+(metaLine(r)?`<span>${esc(metaLine(r))}</span>`:""))+
   `<div class="stack">
     ${draftBar}
     <div class="serv"><span>Servings${scale!==1?` <span style="color:var(--muted)">(recipe makes ${base})</span>`:""}</span><div class="stepper"><button data-act="serv" data-d="-1" aria-label="Fewer servings">−</button><span>${serv}</span><button data-act="serv" data-d="1" aria-label="More servings">+</button></div></div>
@@ -691,6 +710,7 @@ function sheetEditRecipe(){
   const r=sheet.id?S.recipes.find(x=>x.id===sheet.id):null;
   return head(r?"Edit recipe":"New recipe")+`<form id="recipeForm">
     <label class="field">Name<input id="rName" required value="${esc(r?r.name:"")}" placeholder="e.g. Chicken stir-fry"></label>
+    <div class="field"><span>Meal</span><input type="hidden" id="rMeal" value="${esc(r?mealOf(r):(mFilter!=="all"?mFilter:""))}"><div class="mealpick" id="mealPick"></div></div>
     <div class="row2"><label class="field">Serves<input id="rServ" type="number" min="1" inputmode="numeric" value="${esc(r?r.servings||2:2)}"></label><label class="field">Link <span class="hint">optional</span><input id="rLink" type="url" inputmode="url" value="${esc(r?r.link||"":"")}" placeholder="https://"></label></div>
     <label class="field">Ingredients <span class="hint">one per line, like "2 cups flour", "3 eggs" or "salt". Add ", optional" for extras.</span><textarea id="rIngs" rows="8" placeholder="400 g spaghetti&#10;4 tomatoes, diced&#10;3 cloves garlic&#10;2 tbsp olive oil&#10;salt">${esc(r?(r.ingredients||[]).map(lineOf).join("\n"):"")}</textarea></label>
     <div id="rPreview" class="preview" aria-live="polite"></div>
@@ -699,14 +719,21 @@ function sheetEditRecipe(){
     <div class="actions"><button class="btn primary wide" type="submit">Save recipe</button></div>
   </form>`;
 }
+function renderMealPick(){
+  const box=$("#mealPick");if(!box)return;const cur=$("#rMeal").value;
+  const opts=MEALS.slice();mealList().forEach(m=>{if(!opts.some(x=>x.toLowerCase()===m.toLowerCase()))opts.push(m);});
+  if(cur&&!opts.includes(cur))opts.push(cur);
+  box.innerHTML=opts.map(m=>`<button type="button" class="chip" data-act="pickMeal" data-k="${esc(m)}" aria-pressed="${cur===m}">${esc(m)}</button>`).join("")+`<button type="button" class="chip add" data-act="newMeal">+ New</button>`;
+}
 function bindRecipeForm(){
+  renderMealPick();
   const ta=$("#rIngs"),pv=$("#rPreview");
   const upd=()=>{const ps=ta.value.split("\n").map(parseLine).filter(Boolean);pv.hidden=!ps.length;pv.innerHTML=ps.map(p=>{const c=check(p,1);return`<div class="pr"><span class="dot ${c.s}"></span><span class="pq">${esc(qtyText(p.qty,p.unit))||"any"}</span><span>${esc(p.name)}${p.note?`<span class="inote">, ${esc(p.note)}</span>`:""}</span></div>`;}).join("");};
   ta.addEventListener("input",upd);upd();
   $("#recipeForm").addEventListener("submit",async e=>{
     e.preventDefault();const name=$("#rName").value.trim();if(!name)return;
     const data={name,servings:Math.max(1,parseInt($("#rServ").value,10)||1),link:$("#rLink").value.trim(),steps:$("#rSteps").value.trim(),
-      ingredients:ta.value.split("\n").map(parseLine).filter(Boolean),draft:$("#rDraft").checked,example:false};
+      ingredients:ta.value.split("\n").map(parseLine).filter(Boolean),draft:$("#rDraft").checked,meal:$("#rMeal").value.trim(),example:false};
     const id=sheet.id;
     if(id){await store.update("recipes",id,data);toast("Recipe saved");openSheet({type:"recipe",id});}
     else{const nid=await store.add("recipes",data);toast("Recipe added");openSheet({type:"recipe",id:nid});}
@@ -1002,6 +1029,9 @@ document.addEventListener("click",async e=>{
     case"refreshNow":if(auth==="ok")flush();break;
     case"close":closeSheet();break;
     case"rFilter":rFilter=t.dataset.k;renderRecipes();break;
+    case"mFilter":mFilter=t.dataset.k;try{localStorage.setItem("pc.meal",mFilter);}catch(e){}renderRecipes();break;
+    case"pickMeal":{const h=$("#rMeal");if(!h)break;h.value=h.value===t.dataset.k?"":t.dataset.k;renderMealPick();break;}
+    case"newMeal":{const h=$("#rMeal");if(!h)break;const m=cap(String(window.prompt("New meal type (like Snack or Side)","")||"").trim());if(m){h.value=m;renderMealPick();}break;}
     case"newRecipe":openSheet({type:"editRecipe",id:null});break;
     case"openRecipe":openSheet({type:"recipe",id});break;
     case"editRecipe":openSheet({type:"editRecipe",id:sheet.id});break;

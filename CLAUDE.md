@@ -20,11 +20,12 @@ Gary's groceries + recipes app. The pantry works like a game crafting system: ea
 - Features: recipe filters (All / Ready / 1–2 away / Need more / Drafts), optional ingredients (`, optional`), staples (have/out only), unit conversion (Canadian cup = 250 ml), cook with undo, grocery list with "put away", barcode scanning (BarcodeDetector + ponyfill, Open Food Facts lookup, saved mappings in the Barcodes tab), drafts (Draft column), and kawaii recipe icons (inline SVGs in `index.html`, auto-picked from the recipe name, choice saved in the Icon column).
 - Units: the **Units** tab is the master list of units. The app's unit dropdowns follow it (falling back to the built-in list on an older Code.gs), "+ New unit…" in any dropdown adds a row there, and every Unit column in the sheet uses it as its dropdown. Code.gs creates the tab on the first request after deploy, seeded with the standard units plus any already used. Units without a metric conversion (bag, jar…) behave like counts.
 - Back button (Android): closes an open panel, then returns to Recipes, then shows "Press back again to close". Uses a spare history entry added on each tap (popstate handler near the end of the script).
+- Meals: Code.gs reads the Recipes tab's Meal, Cuisine, Difficulty and Cook time columns. The app shows a meal chip row (Breakfast / Lunch / Dinner / Dessert first, then any other value in the Meal column) that combines with the status filters, shows "Meal · Difficulty · Cook time" on cards, and has a meal picker in the recipe editor. Last meal filter is remembered per phone (`pc.meal`).
 - About 80 recipes were imported from Gary's old "Recipes 🍅" sheet.
 
 ## Changing things
 
-- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (currently `pantry-pal-v12`), commit and push to `main`. GitHub Pages serves it within a few minutes; the service worker fetches with `cache: 'no-cache'` so phones pick it up.
+- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (currently `pantry-pal-v13`), commit and push to `main`. GitHub Pages serves it within a few minutes; the service worker fetches with `cache: 'no-cache'` so phones pick it up.
 - **Code.gs**: Gary pastes it into Apps Script, saves, then **Deploy → Manage deployments → pencil → Version: New version → Deploy**. The URL stays the same. Claude can also do this in Gary's Chrome with Claude in Chrome: set the Monaco model's value from the raw GitHub file, Ctrl+S, then redeploy.
 - Commits use author `Claude <noreply@anthropic.com>`; GitHub rejects Gary's private email.
 
