@@ -6,7 +6,7 @@
 ## What it does
 - Groceries + recipes in one. The pantry works like a game crafting system: each recipe shows whether you can make it or which ingredients are missing, and missing ones go straight to the grocery list.
 - Users: Gary and his partner Cecilia, on Samsung Android phones (Chrome, installed as a PWA).
-- Gary likes cute kawaii visuals (app icon: a jar character on mint), clear contrast, and plain-language replies.
+- Gary likes cute kawaii visuals (app icon: a smiling little fridge on mint), clear contrast, and plain-language replies.
 
 ## Stack & hosting
 | Piece | Location |
@@ -70,7 +70,7 @@ Inside the `index.html` script, search for these names:
 - Gary doesn't want his full name in app web addresses.
 
 ## Releasing changes
-- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (now `pantry-pal-v13`), commit and push to `main`. Pages serves it within a few minutes; phones pick it up because the service worker fetches with `cache: 'no-cache'`.
+- **App files** (`index.html`, `sw.js`, icons): edit, bump `CACHE` in `sw.js` (now `pantry-pal-v14`), commit and push to `main`. Pages serves it within a few minutes; phones pick it up because the service worker fetches with `cache: 'no-cache'`.
 - **Code.gs**: Gary pastes it into Apps Script, saves, then **Deploy → Manage deployments → pencil → Version: New version → Deploy** (same URL). Claude can also do this in Gary's Chrome with Claude in Chrome: set the Monaco editor's value from the raw GitHub file, Ctrl+S, then redeploy.
 - Commits use author `Claude <noreply@anthropic.com>`; GitHub rejects Gary's private email.
 
@@ -86,5 +86,6 @@ Inside the `index.html` script, search for these names:
 - Next up: (none recorded)
 
 ## Changelog (latest first, keep about 10 lines)
+- 2026-10-18: New thick-line kawaii app icon (smiling fridge on mint)
 - 2026-10-18: Turned these notes into a one-page brief (schema, API, code map, status)
 - 2026-10-17: Recipes filter by meal; cards show meal, difficulty and cook time; meal picker in the editor
