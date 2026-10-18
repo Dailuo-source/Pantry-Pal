@@ -406,7 +406,7 @@ async function op(fn){try{const r=await fn();return r===undefined?true:r;}catch(
 function setupPWA(){try{const l=document.createElement("link");l.rel="manifest";l.href="manifest.webmanifest";document.head.appendChild(l);if("serviceWorker"in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});}catch(e){}}
 
 async function boot(){
-  try{const b=$(".brand");if(b)b.insertAdjacentHTML("afterbegin",`<span class="brandmark">${kawaiiSvg("jar")}</span>`);}catch(e){}
+  try{const b=$(".brand");if(b)b.insertAdjacentHTML("afterbegin",`<span class="brandmark"><svg viewBox="44 18 112 166" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round"><path d="M74 166 v14 M126 166 v14" stroke="#2b2833" stroke-width="8"/><rect x="54" y="26" width="92" height="142" rx="20" fill="#fff" stroke="#2b2833" stroke-width="8"/><path d="M54 70 H146" stroke="#2b2833" stroke-width="8"/><rect x="124" y="40" width="8" height="18" rx="4" fill="#2b2833"/><rect x="124" y="84" width="8" height="26" rx="4" fill="#2b2833"/><path d="M82 52 c-6 -7 -15 0 -8 7 l8 7 l8 -7 c7 -7 -2 -14 -8 -7z" fill="#f6a5b5"/><circle cx="84" cy="118" r="6.5" fill="#2b2833"/><circle cx="108" cy="118" r="6.5" fill="#2b2833"/><path d="M90 127 Q96 133 102 127" stroke="#2b2833" stroke-width="5.5" fill="none"/><ellipse cx="72" cy="129" rx="7" ry="4.5" fill="#f6a5b5"/><ellipse cx="120" cy="129" rx="7" ry="4.5" fill="#f6a5b5"/></svg></span>`);}catch(e){}
   try{tab=localStorage.getItem("pc.tab")||tab;}catch(e){}
   const h=(location.hash||"").slice(1);if(["recipes","pantry","list"].includes(h))tab=h;
   if(!isGAS)setupPWA();
