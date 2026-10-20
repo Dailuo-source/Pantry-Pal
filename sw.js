@@ -1,7 +1,7 @@
 // Pantry Pal service worker: makes the app installable and opens it offline.
 // Data always comes live from your Google Sheet; only the app's own files are cached.
 // Bump the version when you change files so phones pick up the update.
-const CACHE = 'pantry-pal-v16';
+const CACHE = 'pantry-pal-v17';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './favicon-64.png'];
 
 self.addEventListener('install', (e) => {
