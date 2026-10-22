@@ -7,7 +7,7 @@ Your Google Sheet is the database. You can edit recipes, pantry items and the gr
 1. **Create a blank Google Sheet** and name it `Pantry Pal`.
 2. In the sheet, open **Extensions → Apps Script**.
 3. Replace everything in `Code.gs` with the contents of **Code.gs** from this folder.
-4. Click **+** next to Files → **HTML**, name it `index` (Apps Script adds `.html`), and paste in **index.html**.
+4. Click **+** next to Files → **HTML**, name it `apps-script/index` (Apps Script adds `.html`), and paste in **apps-script/index.html**. (`clasp push` does this for you.)
 5. Save. In the function dropdown pick **setup**, click **Run**, and approve the permissions.
    - This builds the **Pantry**, **Recipes** and **Grocery List** tabs with dropdowns and checkboxes, adds example rows, and creates your **app key** (shown in the execution log).
 6. **Deploy → New deployment → Select type: Web app**
@@ -37,8 +37,8 @@ Your Google Sheet is the database. You can edit recipes, pantry items and the gr
 ## Part 2 (later): install it as an app with GitHub Pages
 
 1. Create a GitHub repository (it needs to be public for free GitHub Pages; no data or key lives in these files).
-2. Upload: `index.html`, `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`.
-3. In `index.html`, set `const API_URL = "...";` near the top of the script to your web app URL (`/exec`).
+2. Put the site files in `web/`: `index.html`, `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`. Only `web/` is published (`.github/workflows/pages.yml`; Settings → Pages → Source: GitHub Actions).
+3. In `web/index.html`, set `const API_URL = "...";` near the top of the script to your web app URL (`/exec`).
 4. Repository **Settings → Pages** → Deploy from branch → `main` / root.
 5. On your phone, open `https://<your-username>.github.io/<repo>/?key=YOUR_KEY` in Chrome, then **⋮ → Add to home screen → Install**.
 

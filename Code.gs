@@ -92,7 +92,7 @@ const SCHEMA = {
 /* ------------------------------------------------------------------ */
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
+  return HtmlService.createHtmlOutputFromFile('apps-script/index')
     .setTitle(APP_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
