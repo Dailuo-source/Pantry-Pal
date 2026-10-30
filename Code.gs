@@ -29,6 +29,9 @@ const SCHEMA = {
       ['inStock', 'In stock', 'bool', 75],
       ['updated', 'Updated', 'date', 110],
       ['example', 'Example', 'bool', 75],
+      ['track', 'Track', 'track', 80],        // count = packages (Amount + Unit), status = Have / Low / Out
+      ['level', 'Level', 'level', 75],        // have, low or out (counted items: low = running low)
+      ['store', 'Usual store', 'store', 130], // fills in the grocery list's store
     ],
   },
   recipes: {
@@ -49,6 +52,14 @@ const SCHEMA = {
       ['cuisine', 'Cuisine', 'text', 110],
       ['difficulty', 'Difficulty', 'text', 90],
       ['cookTime', 'Cook time', 'text', 90],
+      ['photo', 'Photo', 'text', 140],              // Drive file id of your photo; blank = the icon
+      ['upNext', 'Up next', 'num', 75],              // order in the Up next list; blank = not on it
+      ['prep', 'Meal prep', 'bool', 85],
+      ['batch', 'Batch makes', 'num', 95],
+      ['batchName', 'Batch of', 'text', 100],        // e.g. pancakes, containers
+      ['keeps', 'Keeps', 'text', 140],               // e.g. Freezer · 2 months
+      ['prepSteps', 'Prep steps (one per line)', 'text', 260],
+      ['reheat', 'Reheat', 'text', 140],
     ],
   },
   list: {
@@ -61,6 +72,7 @@ const SCHEMA = {
       ['for', 'For recipes', 'list', 200],
       ['checked', 'In cart', 'bool', 70],
       ['created', 'Added', 'date', 110],
+      ['store', 'Store', 'store', 130],
     ],
   },
   // Products you've scanned: barcode → the pantry item it means to you
@@ -85,7 +97,18 @@ const SCHEMA = {
       ['name', 'Unit', 'text', 120],
     ],
   },
+  // Where you shop. Add your own here; the grocery list can be filtered by store.
+  stores: {
+    sheet: 'Stores',
+    cols: [
+      ['id', 'ID', 'id', 80],
+      ['name', 'Store', 'text', 160],
+    ],
+  },
 };
+
+const STORES = ['Costco', 'Asian market', "Farmer's market"];
+const SCHEMA_V = '2'; // bump when columns are added, so existing sheets get them on the next request
 
 /* ------------------------------------------------------------------ */
 /* Web app entry points                                                */
@@ -103,7 +126,8 @@ function doPost(e) {
 }
 
 /**
- * Request:  { key, ops: [{op: 'add'|'update'|'del', coll: 'items'|'recipes'|'list'|'barcodes'|'units', id, data}] }
+ * Request:  { key, ops: [{op: 'add'|'update'|'del'|'photo', coll: 'items'|'recipes'|'list'|'barcodes'|'units'|'stores', id, data}] }
+ *           'photo' saves data.b64 (a JPEG) to Drive and puts its file id in the recipe's Photo column.
  * Response: { ok: true, state: {items, recipes, list}, sheetUrl } or { ok: false, error, message }
  * An empty ops list just returns the current state.
  */
@@ -123,6 +147,7 @@ function api(body) {
   if (!lock.tryLock(20000)) return { ok: false, error: 'busy', message: 'The sheet is busy. Try again in a moment.' };
   try {
     ensureUnits_(ss_());
+    migrate_(ss_());
     (req.ops || []).forEach(applyOp_);
     SpreadsheetApp.flush();
     return { ok: true, state: readAll_(), sheetUrl: ss_().getUrl() };
@@ -248,6 +273,10 @@ function readAll_() {
 function applyOp_(op) {
   const sch = SCHEMA[op.coll];
   if (!sch) throw new Error('Unknown list "' + op.coll + '".');
+  if (op.op === 'photo') {
+    const d = op.data || {};
+    op = { op: 'update', coll: op.coll, id: op.id, data: { photo: savePhoto_(op.id, d.b64, d.mime, d.name) } };
+  }
   const ss = ss_();
   // A tab added in a later version (like Barcodes) is created the first time it's used
   const sh = ss.getSheetByName(sch.sheet) || buildTab_(ss, sch);
@@ -283,6 +312,54 @@ function applyOp_(op) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Upgrades and photos                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Adds new columns and tabs to an existing sheet once per schema version. Never removes anything. */
+function migrate_(ss) {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('SCHEMA_V') === SCHEMA_V) return;
+  const hadStores = !!ss.getSheetByName(SCHEMA.stores.sheet);
+  buildTab_(ss, SCHEMA.stores); // first, so the Store dropdowns can point at it
+  Object.keys(SCHEMA).forEach(function (coll) { if (coll !== 'stores') buildTab_(ss, SCHEMA[coll]); });
+  if (!hadStores) {
+    const sh = ss.getSheetByName(SCHEMA.stores.sheet);
+    sh.getRange(2, 1, STORES.length, 2).setValues(STORES.map(function (n) { return [newId_(), n]; }));
+    sh.getRange(1, 3).setValue('Add a store on a new row. It shows up in the app and in the Store dropdowns.').setFontStyle('italic').setFontColor('#4D5853');
+  }
+  props.setProperty('SCHEMA_V', SCHEMA_V);
+}
+
+/** Photos live in Google Drive: My AI Apps / Pantry Pal photos. */
+function photoFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const saved = props.getProperty('PHOTO_FOLDER');
+  if (saved) { try { return DriveApp.getFolderById(saved); } catch (e) { /* folder was deleted: make a new one */ } }
+  const top = DriveApp.getFoldersByName('My AI Apps');
+  const parent = top.hasNext() ? top.next() : DriveApp.createFolder('My AI Apps');
+  const inner = parent.getFoldersByName('Pantry Pal photos');
+  const folder = inner.hasNext() ? inner.next() : parent.createFolder('Pantry Pal photos');
+  props.setProperty('PHOTO_FOLDER', folder.getId());
+  return folder;
+}
+
+function savePhoto_(recipeId, b64, mime, name) {
+  if (!b64) throw new Error('No photo was sent.');
+  const clean = String(name || 'recipe').replace(/[^\w -]/g, '').trim() || 'recipe';
+  const blob = Utilities.newBlob(Utilities.base64Decode(b64), mime || 'image/jpeg', clean + ' ' + recipeId + '.jpg');
+  const file = photoFolder_().createFile(blob);
+  // Link sharing lets the phone show the photo; only someone with the exact link can open it
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { /* sharing blocked by an admin */ }
+  return file.getId();
+}
+
+/** Run this once from the Apps Script editor so the app may save photos to your Drive. */
+function authorizePhotos() {
+  const f = photoFolder_();
+  console.log('Photos will be saved to: My AI Apps / ' + f.getName());
+}
+
+/* ------------------------------------------------------------------ */
 /* Setup, menu and key                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -303,6 +380,7 @@ function setup() {
   props.setProperty('SHEET_ID', ss.getId());
 
   ensureUnits_(ss);
+  migrate_(ss);
   Object.keys(SCHEMA).forEach(function (coll) { buildTab_(ss, SCHEMA[coll]); });
 
   ['Sheet1', 'Sheet 1'].forEach(function (n) {
@@ -421,6 +499,12 @@ function buildTab_(ss, sch) {
     if (type === 'section') rng.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(SECTIONS, true).setAllowInvalid(true).build());
     if (type === 'date') rng.setNumberFormat('mmm d, yyyy');
     if (type === 'code') rng.setNumberFormat('@');
+    if (type === 'track') rng.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['count', 'status'], true).setAllowInvalid(true).build());
+    if (type === 'level') rng.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['have', 'low', 'out'], true).setAllowInvalid(true).build());
+    if (type === 'store') {
+      const st = ss.getSheetByName(SCHEMA.stores.sheet);
+      if (st) rng.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(st.getRange('B2:B'), true).setAllowInvalid(true).build());
+    }
     if (field === 'ingredients' || field === 'steps') rng.setWrap(true);
     if (w) sh.setColumnWidth(col, w);
     if (field === 'id') sh.hideColumns(col);
