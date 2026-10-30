@@ -103,7 +103,7 @@ Inside the `index.html` script, search for:
 
 ## Status
 - Working (redesign, 2026-10-30): recipes home with Up next + meal shelves + search, recipe page with tick-offs and I have it, meal prep ×1–×5, edit recipe (name-first rows, unit chips, meal prep settings), I cooked this check, pantry (packages or Have/Low/Out, inline editor, usual store), quick add, grocery list by store/aisle with sparkle Add, photos, barcode scanning.
-- To check: Code.gs deployed with SCHEMA_V 2 and `authorizePhotos` run; until then Low, stores, Up next, meal prep and photos don't stick after a sync.
+- Deployed 2026-10-30 (Apps Script version 10, same /exec URL) and `authorizePhotos` run. To check on the phone: new columns/Stores tab appear after first sync; a photo saves.
 
 ## Changelog (latest first, keep about 5 lines)
 - 2026-10-30: Big redesign (navy/teal, Figtree): pantry stops measuring, stores on the list, meal prep, Up next, photos; new columns + Stores tab via migrate_
