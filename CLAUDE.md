@@ -7,6 +7,8 @@ Groceries + recipes in one. Each recipe shows whether you can make it or what's 
 
 Look (redesign 2026-10-30, mockup: Design canvas "Pantry Pal redesign"): dark only, deep navy + blue-green accent `#5FD4C8`, soft sand for Low and dusty rose for Out, Figtree font, compact rows (48 px), square checkboxes with rounded corners.
 
+Desktop (2026-10-31, mockup: Design canvas "Pantry Pal desktop"): same page, switches at **1000 px** wide (`DESK` media query). Side menu instead of bottom tabs, pages fill the whole width (**never add a max-width**), tick-boxes + a sticky bulk bar on every tab. Phones are unchanged.
+
 ## Stack & hosting
 | Piece | Location |
 |---|---|
@@ -55,6 +57,7 @@ Inside the `index.html` script, search for:
 - Pantry model: `effQty`, `isCounted`, `levelOf`, `pkgUnits`, `itemAmount`, `storeList`, `setItem`, `newItem`
 - Recipe matching: `findItem`, `check`/`checkRaw`, `stats`, `niceAmt`, `photoSrc`
 - Screens: `render` (draws each tab's header), `refresh`, `renderRecipes` (Up next, meal chips, shelves, search), `renderPantry`/`itemRow`/`itemEditor`, `renderList`/`listRow`
+- Desktop (the block just before `KAWAII`): `isDesk`, `renderSide`, `deskHead`, `renderPantryDesk`/`trow`, `renderListDesk`/`lcard`, `renderRecipesDesk`/`rwrap`; selection sets `selP`/`selL`/`selR` with `order` + `selToggle` (Shift = range); bulk actions `bulkLevelP`, `bulkFieldP`, `bulkDelP`, `bulkDelL`, `bulkMealR`… (Undo via `restoreItems`); `quickList`/`parseAddLine` (add bar, "2 packs"/"x3" after the name); Add several = sheet `bulk` (`sheetBulk`, `bulkRows`, `bulkGo`); `deskKey` (/ N Ctrl+A Del Esc); drag and drop (`data-drag` cards → `data-dropstore` columns, `data-undrag` Up next)
 - Panels: `openSheet(s, push)` / `closeSheet` (stacked, Back pops), `renderSheet`, `sheetRecipe`, `sheetPrep`, `sheetEditRecipe` (works on `sheet.ed`, `edSave`), `sheetCooked`/`cookSave`, `sheetAdd`/`qaGo` (quick add), `sheetIconPick`, `ingRows`, `picBlock`
 - Actions: `haveIt`, `addToList`, `addMissing`, `putAway`, `stepItem`, `sparkle`, `shrinkPhoto`/`sendPhoto`
 - Icons: `KAWAII` (see token trap), `autoIcon`, `iconKey`/`iconInner`/`smallPic`
@@ -78,9 +81,11 @@ Inside the `index.html` script, search for:
 - Barcodes: BarcodeDetector + ponyfill, Open Food Facts lookup, stored as text (leading `'`) to keep zeros.
 - Back button: closes a panel, then returns to Recipes, then "Press back again to close".
 - No full name in app web addresses.
+- **Desktop:** side menu; recipe/meal prep/edit open as a right-hand pane (`.sheet-wrap.drawer`, `body.paned`) so the library stays clickable; other panels are centred dialogs. Pantry = table (Table / Shelves switch), grocery list = one column per store + right rail (low/out suggestions, Up next, cart), recipes = card grid. Selections only cover what's on screen. Every bulk change except "add to list" has Undo in the toast.
+- **Add several at once** (desktop button, and "Paste a whole list" in phone quick add): one item per line, preview with section / keep track by / amount / store per row, nothing saves until Add.
 
 ## Releasing changes
-- **App files**: edit, bump `CACHE` in `web/sw.js` (now `pantry-pal-v18`), copy `web/index.html` to `apps-script/index.html`, commit and push to `main`.
+- **App files**: edit, bump `CACHE` in `web/sw.js` (now `pantry-pal-v19`), copy `web/index.html` to `apps-script/index.html`, commit and push to `main`.
 - **Code.gs**: paste into Apps Script, save, **Deploy → Manage deployments → pencil → New version → Deploy** (same URL). Via Claude in Chrome: set the Monaco editor value from the raw GitHub file, Ctrl+S, redeploy.
 - Photos need Drive access once: in the Apps Script editor run `authorizePhotos` and allow it, then redeploy.
 - Commits use author `Claude <noreply@anthropic.com>`.
@@ -102,15 +107,16 @@ Inside the `index.html` script, search for:
 - The camera doesn't work inside the Apps Script iframe, only on the GitHub Pages copy.
 
 ## Status
+- Desktop layout (2026-10-31): built and checked in a browser at 1440, 1920 and phone widths against a pretend sheet (bulk Have/Low/Out + Undo, bulk store/section/meal, Shift-range, Ctrl+A, inline rename, drag to a store, add bar, Add several). Front end only; Code.gs unchanged. To check: Gary on his PC with the real sheet.
 - Working (redesign, 2026-10-30): recipes home with Up next + meal shelves + search, recipe page with tick-offs and I have it, meal prep ×1–×5, edit recipe (name-first rows, unit chips, meal prep settings), I cooked this check, pantry (packages or Have/Low/Out, inline editor, usual store), quick add, grocery list by store/aisle with sparkle Add, photos, barcode scanning.
 - Deployed 2026-10-30 (Apps Script version 10, same /exec URL) and `authorizePhotos` run. To check on the phone: new columns/Stores tab appear after first sync; a photo saves.
 
 ## Changelog (latest first, keep about 5 lines)
+- 2026-10-31: Desktop layout at 1000 px+: side menu, pantry table, store columns, recipe grid + side pane, bulk edit with Undo, Add several at once, keyboard shortcuts
 - 2026-10-30: Big redesign (navy/teal, Figtree): pantry stops measuring, stores on the list, meal prep, Up next, photos; new columns + Stores tab via migrate_
 - 2026-10-21: Moved the site files into `web/`; only that folder is published
 - 2026-10-20: color-scheme meta so Chrome keeps its bars dark in dark mode
 - 2026-10-19: Dark install colours so Android's bottom bar isn't white
-- 2026-10-18: New kawaii app icon (smiling fridge on mint), also the header logo
 
 ## Working efficiently
 - Find code with search first, then read only the relevant lines. Don't read index.html top to bottom.
