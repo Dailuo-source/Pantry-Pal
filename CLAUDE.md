@@ -1,7 +1,7 @@
 # Pantry Pal — Brief
 
 > **Claude: read this first.** Open only the files a change touches; use the code map to jump to a function instead of reading whole files.
-> At the end of a work session, update **Status** and add one line to **Changelog** (keep about 5).
+> At the end of a work session, update **Status** and add one line to **Changelog** (keep about 5). Keep **For Gary** current too: tick off (delete) what's done, add each step Gary must do himself (deploy, sheet menus, settings, checks). App Atlas reads Status, For Gary and Changelog to show where each app is.
 
 Groceries + recipes in one. Each recipe shows whether you can make it or what's missing, and missing items go straight to the grocery list. Users: Gary and Cecilia on Samsung Android phones (Chrome PWA). Gary likes cute kawaii visuals (icon: smiling fridge on mint), clear contrast and plain-language replies.
 
@@ -110,6 +110,13 @@ Inside the `index.html` script, search for:
 - Desktop layout (2026-10-31): built and checked in a browser at 1440, 1920 and phone widths against a pretend sheet (bulk Have/Low/Out + Undo, bulk store/section/meal, Shift-range, Ctrl+A, inline rename, drag to a store, add bar, Add several). Front end only; Code.gs unchanged. To check: Gary on his PC with the real sheet.
 - Working (redesign, 2026-10-30): recipes home with Up next + meal shelves + search, recipe page with tick-offs and I have it, meal prep ×1–×5, edit recipe (name-first rows, unit chips, meal prep settings), I cooked this check, pantry (packages or Have/Low/Out, inline editor, usual store), quick add, grocery list by store/aisle with sparkle Add, photos, barcode scanning.
 - Deployed 2026-10-30 (Apps Script version 10, same /exec URL) and `authorizePhotos` run. To check on the phone: new columns/Stores tab appear after first sync; a photo saves.
+
+## For Gary
+
+Steps only Gary can do (App Atlas shows these as his to-dos). One line each; delete a line once it's done.
+
+- [ ] Check the desktop layout on your PC with the real sheet
+- [ ] On the phone: new columns and Stores tab appear after a sync, and a photo saves
 
 ## Changelog (latest first, keep about 5 lines)
 - 2026-10-31: Desktop layout at 1000 px+: side menu, pantry table, store columns, recipe grid + side pane, bulk edit with Undo, Add several at once, keyboard shortcuts
