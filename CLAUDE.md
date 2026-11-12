@@ -107,7 +107,7 @@ Inside the `index.html` script, search for:
 - The camera doesn't work inside the Apps Script iframe, only on the GitHub Pages copy.
 
 ## Status
-- Deployed 2026-11-12 (Apps Script version 11, same /exec URL): Apps Script copy of the app now has the desktop layout too; Code.gs was already current, unchanged. GitHub Pages copy has had it since 2026-10-31.
+- Deployed 2026-11-12 (Apps Script version 12, same /exec URL): Apps Script copy of the app has the desktop layout and the Motion pack; Code.gs unchanged. GitHub Pages copy has had it since 2026-10-31.
 - Desktop layout (2026-10-31): built and checked in a browser at 1440, 1920 and phone widths against a pretend sheet (bulk Have/Low/Out + Undo, bulk store/section/meal, Shift-range, Ctrl+A, inline rename, drag to a store, add bar, Add several). Front end only. To check: Gary on his PC with the real sheet.
 - Working (redesign, 2026-10-30): recipes home with Up next + meal shelves + search, recipe page with tick-offs and I have it, meal prep ×1–×5, edit recipe (name-first rows, unit chips, meal prep settings), I cooked this check, pantry (packages or Have/Low/Out, inline editor, usual store), quick add, grocery list by store/aisle with sparkle Add, photos, barcode scanning.
 - `authorizePhotos` run 2026-10-30. To check on the phone: new columns/Stores tab appear after first sync; a photo saves.
@@ -124,6 +124,7 @@ Steps only Gary can do (App Atlas shows these as his to-dos). One line each; del
 - **Motion pack** (`window.MP`, same copy in every app; Climb Buddy is the model): the `<script>` block before `</body>` in `web/index.html`, set up by the `MP.init({...})` line under it. Panels rise from the bottom and slip back down, toasts rise and slip away (setting `.hidden = true` plays the slip-away first, then hides; the app still reads `.hidden` as true at once), a new screen's pieces rise in one after another, and a new row on the same screen rises in. Unhurried (Gary wants animations easy to see); off under reduced motion. If a close function empties or removes the panel, do it after `MP.ms` (or use `MP.out(el, done)`), or the panel slides away empty.
 
 ## Changelog (latest first, keep about 5 lines)
+- 2026-11-12: Apps Script version 12 (same URL): Motion pack in the Apps Script copy
 - 2026-11-12: Motion pack: panels and toasts rise and slip away, new screens rise in, new rows rise in. sw pantry-pal-v20 (apps-script/index.html copied)
 - 2026-11-12: Apps Script version 11 (same URL): desktop layout now in the Apps Script copy too
 - 2026-10-31: Desktop layout at 1000 px+: side menu, pantry table, store columns, recipe grid + side pane, bulk edit with Undo, Add several at once, keyboard shortcuts
