@@ -107,9 +107,10 @@ Inside the `index.html` script, search for:
 - The camera doesn't work inside the Apps Script iframe, only on the GitHub Pages copy.
 
 ## Status
-- Desktop layout (2026-10-31): built and checked in a browser at 1440, 1920 and phone widths against a pretend sheet (bulk Have/Low/Out + Undo, bulk store/section/meal, Shift-range, Ctrl+A, inline rename, drag to a store, add bar, Add several). Front end only; Code.gs unchanged. To check: Gary on his PC with the real sheet.
+- Deployed 2026-11-12 (Apps Script version 11, same /exec URL): Apps Script copy of the app now has the desktop layout too; Code.gs was already current, unchanged. GitHub Pages copy has had it since 2026-10-31.
+- Desktop layout (2026-10-31): built and checked in a browser at 1440, 1920 and phone widths against a pretend sheet (bulk Have/Low/Out + Undo, bulk store/section/meal, Shift-range, Ctrl+A, inline rename, drag to a store, add bar, Add several). Front end only. To check: Gary on his PC with the real sheet.
 - Working (redesign, 2026-10-30): recipes home with Up next + meal shelves + search, recipe page with tick-offs and I have it, meal prep ×1–×5, edit recipe (name-first rows, unit chips, meal prep settings), I cooked this check, pantry (packages or Have/Low/Out, inline editor, usual store), quick add, grocery list by store/aisle with sparkle Add, photos, barcode scanning.
-- Deployed 2026-10-30 (Apps Script version 10, same /exec URL) and `authorizePhotos` run. To check on the phone: new columns/Stores tab appear after first sync; a photo saves.
+- `authorizePhotos` run 2026-10-30. To check on the phone: new columns/Stores tab appear after first sync; a photo saves.
 
 ## For Gary
 
@@ -119,11 +120,11 @@ Steps only Gary can do (App Atlas shows these as his to-dos). One line each; del
 - [ ] On the phone: new columns and Stores tab appear after a sync, and a photo saves
 
 ## Changelog (latest first, keep about 5 lines)
+- 2026-11-12: Apps Script version 11 (same URL): desktop layout now in the Apps Script copy too
 - 2026-10-31: Desktop layout at 1000 px+: side menu, pantry table, store columns, recipe grid + side pane, bulk edit with Undo, Add several at once, keyboard shortcuts
 - 2026-10-30: Big redesign (navy/teal, Figtree): pantry stops measuring, stores on the list, meal prep, Up next, photos; new columns + Stores tab via migrate_
 - 2026-10-21: Moved the site files into `web/`; only that folder is published
 - 2026-10-20: color-scheme meta so Chrome keeps its bars dark in dark mode
-- 2026-10-19: Dark install colours so Android's bottom bar isn't white
 
 ## Working efficiently
 - Find code with search first, then read only the relevant lines. Don't read index.html top to bottom.
