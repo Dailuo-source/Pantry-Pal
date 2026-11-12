@@ -119,7 +119,12 @@ Steps only Gary can do (App Atlas shows these as his to-dos). One line each; del
 - [ ] Check the desktop layout on your PC with the real sheet
 - [ ] On the phone: new columns and Stores tab appear after a sync, and a photo saves
 
+## Motion
+
+- **Motion pack** (`window.MP`, same copy in every app; Climb Buddy is the model): the `<script>` block before `</body>` in `web/index.html`, set up by the `MP.init({...})` line under it. Panels rise from the bottom and slip back down, toasts rise and slip away (setting `.hidden = true` plays the slip-away first, then hides; the app still reads `.hidden` as true at once), a new screen's pieces rise in one after another, and a new row on the same screen rises in. Unhurried (Gary wants animations easy to see); off under reduced motion. If a close function empties or removes the panel, do it after `MP.ms` (or use `MP.out(el, done)`), or the panel slides away empty.
+
 ## Changelog (latest first, keep about 5 lines)
+- 2026-11-12: Motion pack: panels and toasts rise and slip away, new screens rise in, new rows rise in. sw pantry-pal-v20 (apps-script/index.html copied)
 - 2026-11-12: Apps Script version 11 (same URL): desktop layout now in the Apps Script copy too
 - 2026-10-31: Desktop layout at 1000 px+: side menu, pantry table, store columns, recipe grid + side pane, bulk edit with Undo, Add several at once, keyboard shortcuts
 - 2026-10-30: Big redesign (navy/teal, Figtree): pantry stops measuring, stores on the list, meal prep, Up next, photos; new columns + Stores tab via migrate_
